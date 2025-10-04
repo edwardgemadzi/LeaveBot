@@ -11,13 +11,37 @@ export default async function handler(req: any, res: any) {
   }
 
   if (req.method === 'GET') {
-    const year = req.query.year || new Date().getFullYear();
-    const month = req.query.month || new Date().getMonth() + 1;
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' });
+    }
+
+    // Generate calendar days for the date range
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const calendar = [];
+    
+    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+      const dateStr = date.toISOString().slice(0, 10);
+      const dayOfWeek = date.getDay();
+      
+      // Skip weekends (0 = Sunday, 6 = Saturday) for day shift workers
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      
+      calendar.push({
+        date: dateStr,
+        status: 'available',
+        requests: [],
+        isWorkday: !isWeekend
+      });
+    }
     
     return res.json({
-      calendar: [],
-      year,
-      month
+      calendar,
+      startDate,
+      endDate
     });
   }
 
