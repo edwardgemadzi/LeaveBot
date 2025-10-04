@@ -1,17 +1,5 @@
 {
-  "buildCommand": "cd client && npm install && npm run build",
+  "buildCommand": "cd client && npm install && npm run build && cd ../server && npm install && npm run build",
   "outputDirectory": "client/dist",
-  "installCommand": "npm install --prefix client",
-  "framework": null,
-  "functions": {
-    "server/src/vercel.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/server/src/vercel.ts"
-    }
-  ]
+  "installCommand": "echo 'Dependencies installed during build'"
 }
