@@ -1,5 +1,23 @@
 # 🔐 LeaveBot Authentication & Authorization System
 
+## ✅ IMPLEMENTATION STATUS: COMPLETE
+
+**Web authentication is now live!** Visit https://leave-bot-wine.vercel.app and login with your Telegram username.
+
+### Quick Login Guide
+
+**Admin Access:**
+- Username: `edgemadzi` (your Telegram username)
+- Full access to all features including approving requests
+
+**Team Members:**
+- Username: `teammember1` or `teammember2` (demo accounts)
+- Can view calendar and submit leave requests
+
+All API endpoints are now protected and require authentication. The system shows your role badge (Admin/Supervisor) next to your name in the header.
+
+---
+
 ## Overview
 
 This document outlines the multi-role authentication system being added to LeaveBot with three user roles:
