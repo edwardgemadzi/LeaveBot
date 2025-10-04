@@ -14,11 +14,11 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Request failed" }));
+    const error = await response.json().catch(() => ({ error: "Request failed" })) as { error?: string };
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
 // Register or get employee by Telegram username

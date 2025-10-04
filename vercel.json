@@ -1,9 +1,1 @@
-{
-  "buildCommand": "cd client && npm install && npm run build && cd .. && mkdir -p public && cp -r client/dist/* public/ && cd server && npm install && npm run build",
-  "outputDirectory": "public",
-  "functions": {
-    "api/*.ts": {
-      "runtime": "nodejs20.x"
-    }
-  }
-}
+{}
