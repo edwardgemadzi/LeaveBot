@@ -1,8 +1,8 @@
 // API endpoint: /api/telegram/check-user
-// Check if a Telegram user is registered in the system
+// Check if a Telegram username is registered in the system
 
-import { getUserByUsername, createUser } from '../_lib/users';
-import { cacheChatId } from '../_lib/telegram';
+import { getUserByUsername, createUser } from '../lib/users';
+import { cacheChatId } from '../lib/telegram';
 
 export default async function handler(req: any, res: any) {
   // Enable CORS

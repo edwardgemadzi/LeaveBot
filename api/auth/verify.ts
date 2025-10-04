@@ -1,8 +1,8 @@
 // API endpoint: /api/auth/verify
-// Step 2: Verify OTP and return authentication token
+// Step 2: Verify OTP and complete login
 
-import { verifyOTP } from '../_lib/otp';
-import { getUserById } from '../_lib/users';
+import { verifyOTP } from '../lib/otp';
+import { getUserById } from '../lib/users';
 
 export default async function handler(req: any, res: any) {
   // Enable CORS

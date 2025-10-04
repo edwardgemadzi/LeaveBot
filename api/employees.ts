@@ -1,6 +1,6 @@
 // API endpoint: /api/employees
 
-import { getAllUsers } from './_lib/users';
+import { getAllUsers } from './lib/users';
 
 function validateAuth(req: any): boolean {
   const authHeader = req.headers.authorization;

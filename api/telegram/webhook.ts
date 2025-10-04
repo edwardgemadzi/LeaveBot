@@ -1,7 +1,7 @@
 // API endpoint: /api/telegram/webhook
 // Receives messages from Telegram via webhook
 
-import { cacheChatId } from '../_lib/telegram';
+import { cacheChatId } from '../lib/telegram';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -32,7 +32,7 @@ async function sendMessage(chatId: number, text: string, options: any = {}) {
 }
 
 // Check if user is registered
-async function checkUserRegistration(username: string) {
+async function checkUserRegistration(username: string): Promise<any> {
   try {
     const baseUrl = process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}`

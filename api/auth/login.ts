@@ -1,9 +1,9 @@
 // API endpoint: /api/auth/login
 // Step 1: Request OTP - generates and sends OTP to Telegram
 
-import { generateOTP, storeOTP, hasRecentOTP } from '../_lib/otp';
-import { sendOTPToTelegram } from '../_lib/telegram';
-import { getUserByUsername } from '../_lib/users';
+import { generateOTP, storeOTP, hasRecentOTP } from '../lib/otp';
+import { sendOTPToTelegram } from '../lib/telegram';
+import { getUserByUsername } from '../lib/users';
 
 export default async function handler(req: any, res: any) {
   // Enable CORS

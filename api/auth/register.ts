@@ -1,7 +1,7 @@
 // API endpoint: /api/auth/register
-// Admin-only endpoint to register new users
+// Register new users (admin/supervisor only)
 
-import { createUser, getUserByUsername } from '../_lib/users';
+import { createUser, getUserByUsername } from '../lib/users';
 
 function validateAuth(req: any): { valid: boolean; userId?: number; role?: string } {
   const authHeader = req.headers.authorization;
