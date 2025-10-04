@@ -58,12 +58,12 @@ export default async function handler(req: any, res: any) {
       return res.status(403).json({ error: 'Only admins and supervisors can register new users' });
     }
 
-    const { name, telegram_username, password, role, supervisor_id } = req.body;
+    const { name, username, password, role, supervisor_id } = req.body;
 
     // Validate required fields
-    if (!name || !telegram_username || !password || !role) {
+    if (!name || !username || !password || !role) {
       return res.status(400).json({ 
-        error: 'Name, telegram_username, password, and role are required' 
+        error: 'Name, username, password, and role are required' 
       });
     }
 
@@ -89,17 +89,17 @@ export default async function handler(req: any, res: any) {
     }
 
     // Check if username already exists
-    const existingUser = getUserByUsername(telegram_username);
+    const existingUser = getUserByUsername(username);
     if (existingUser) {
       return res.status(409).json({ 
-        error: 'A user with this Telegram username already exists' 
+        error: 'A user with this username already exists' 
       });
     }
 
     // Create new user (in production, hash the password!)
     const newUser = createUser({
       name: name.trim(),
-      telegram_username: telegram_username.toLowerCase().trim(),
+      username: username.toLowerCase().trim().replace(/^@/, ''),
       password: password, // In production: await bcrypt.hash(password, 10)
       role,
       created_by: auth.userId,
@@ -112,7 +112,7 @@ export default async function handler(req: any, res: any) {
       user: {
         id: newUser.id,
         name: newUser.name,
-        telegram_username: newUser.telegram_username,
+        username: newUser.username,
         role: newUser.role,
       },
     });

@@ -21,16 +21,14 @@ export default function Login() {
     }
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          telegram_username: username.trim(),
+          username: username.trim(),
           password 
         }),
-      });
-
-      const data = await response.json();
+      });      const data = await response.json();
 
       if (!response.ok) {
         setError(data.error || 'Login failed');
@@ -109,7 +107,7 @@ export default function Login() {
             🔒 Secure login
           </p>
           <p className="default-credentials">
-            <small>Default: @edgemadzi / admin123</small>
+            <small>Default: edgemadzi / admin123</small>
           </p>
         </div>
       </div>

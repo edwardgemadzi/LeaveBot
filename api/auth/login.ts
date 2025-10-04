@@ -18,16 +18,16 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { telegram_username, password } = req.body;
+    const { username, password } = req.body;
 
-    if (!telegram_username || !password) {
+    if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const username = telegram_username.toLowerCase().trim();
+    const cleanUsername = username.toLowerCase().trim().replace(/^@/, '');
 
     // Get user from database
-    const user = getUserByUsername(username);
+    const user = getUserByUsername(cleanUsername);
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid username or password' });
@@ -39,7 +39,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Simple auth token (in production, use proper JWT)
-    const token = Buffer.from(`${user.id}:${user.telegram_username}`).toString('base64');
+    const token = Buffer.from(`${user.id}:${user.username}`).toString('base64');
 
     return res.json({
       success: true,
@@ -47,7 +47,7 @@ export default async function handler(req: any, res: any) {
       user: {
         id: user.id,
         name: user.name,
-        telegram_username: user.telegram_username,
+        username: user.username,
         role: user.role,
       },
       token,

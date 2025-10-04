@@ -4,7 +4,7 @@
 export interface User {
   id: number;
   name: string;
-  telegram_username: string;
+  username: string;
   password: string;
   role: 'admin' | 'supervisor' | 'team_member';
   created_by?: number;
@@ -17,7 +17,7 @@ const defaultUsers: User[] = [
   {
     id: 1,
     name: 'Edward Gemadzi',
-    telegram_username: 'edgemadzi',
+    username: 'edgemadzi',
     password: 'admin123', // In production, hash this!
     role: 'admin',
     created_at: Date.now(),
@@ -33,7 +33,7 @@ export function getAllUsers(): User[] {
 }
 
 export function getUserByUsername(username: string): User | undefined {
-  return users.find(u => u.telegram_username.toLowerCase() === username.toLowerCase());
+  return users.find(u => u.username.toLowerCase() === username.toLowerCase());
 }
 
 export function getUserById(id: number): User | undefined {
