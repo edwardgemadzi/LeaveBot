@@ -4,20 +4,18 @@ import './Login.css';
 
 export default function Login() {
   const [username, setUsername] = useState('');
-  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<'username' | 'otp'>('username');
-  const [userInfo, setUserInfo] = useState<any>(null);
   const { login } = useAuth();
 
-  const handleUsernameSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    if (!username.trim()) {
-      setError('Please enter your Telegram username');
+    if (!username.trim() || !password) {
+      setError('Please enter both username and password');
       setIsLoading(false);
       return;
     }
@@ -26,57 +24,16 @@ export default function Login() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegram_username: username.trim() }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to send verification code');
-        if (data.hint) {
-          setError(`${data.error}\n\n${data.hint}`);
-        }
-        setIsLoading(false);
-        return;
-      }
-
-      setUserInfo(data.user);
-      setStep('otp');
-    } catch (err) {
-      setError('Network error. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOtpSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    if (!otp.trim()) {
-      setError('Please enter the verification code');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           telegram_username: username.trim(),
-          otp: otp.trim() 
+          password 
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Invalid verification code');
-        if (data.hint) {
-          setError(`${data.error}. ${data.hint}`);
-        }
+        setError(data.error || 'Login failed');
         setIsLoading(false);
         return;
       }
@@ -86,52 +43,11 @@ export default function Login() {
       localStorage.setItem('leavebot_token', data.token);
       
       // Trigger login in AuthContext
-      const success = await login(username.trim());
-      
-      if (!success) {
-        setError('Login failed. Please try again.');
-      }
+      await login(username.trim());
     } catch (err) {
       setError('Network error. Please try again.');
-    } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleResendOtp = async () => {
-    setError('');
-    setOtp('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegram_username: username.trim() }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to resend code');
-        setIsLoading(false);
-        return;
-      }
-
-      setError('');
-      alert('New verification code sent to your Telegram!');
-    } catch (err) {
-      setError('Network error. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBack = () => {
-    setStep('username');
-    setOtp('');
-    setError('');
-    setUserInfo(null);
   };
 
   return (
@@ -142,100 +58,58 @@ export default function Login() {
           <p>Employee Leave Management System</p>
         </div>
 
-        {step === 'username' ? (
-          <form onSubmit={handleUsernameSubmit} className="login-form">
-            <div className="form-group">
-              <label htmlFor="username">Telegram Username</label>
-              <div className={`input-wrapper ${isLoading ? 'disabled' : ''}`}>
-                <span className="input-prefix">@</span>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="username"
-                  disabled={isLoading}
-                  autoFocus
-                  autoComplete="username"
-                />
-              </div>
-              <small className="input-hint">
-                Enter your Telegram username (without @)
-              </small>
-            </div>
-
-            {error && (
-              <div className="error-message">
-                {error}
-              </div>
-            )}
-
-            <button type="submit" disabled={isLoading} className="login-button">
-              {isLoading ? 'Sending code...' : 'Send Verification Code'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleOtpSubmit} className="login-form">
-            <div className="otp-info">
-              <p className="otp-sent-message">
-                � Verification code sent to <strong>@{username}</strong> on Telegram
-              </p>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="otp">Verification Code</label>
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="username">Telegram Username</label>
+            <div className={`input-wrapper ${isLoading ? 'disabled' : ''}`}>
+              <span className="input-prefix">@</span>
               <input
-                id="otp"
+                id="username"
                 type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="username"
                 disabled={isLoading}
                 autoFocus
-                maxLength={6}
-                className="otp-input"
-                autoComplete="one-time-code"
+                autoComplete="username"
               />
-              <small className="input-hint">
-                Enter the 6-digit code from Telegram
-              </small>
             </div>
+            <small className="input-hint">
+              Enter your Telegram username (without @)
+            </small>
+          </div>
 
-            {error && (
-              <div className="error-message">
-                {error}
-              </div>
-            )}
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              disabled={isLoading}
+              autoComplete="current-password"
+              className="password-input"
+            />
+          </div>
 
-            <button type="submit" disabled={isLoading} className="login-button">
-              {isLoading ? 'Verifying...' : 'Verify & Login'}
-            </button>
-
-            <div className="otp-actions">
-              <button
-                type="button"
-                onClick={handleResendOtp}
-                disabled={isLoading}
-                className="link-button"
-              >
-                Resend Code
-              </button>
-              <span className="separator">•</span>
-              <button
-                type="button"
-                onClick={handleBack}
-                disabled={isLoading}
-                className="link-button"
-              >
-                Change Username
-              </button>
+          {error && (
+            <div className="error-message">
+              {error}
             </div>
-          </form>
-        )}
+          )}
+
+          <button type="submit" disabled={isLoading} className="login-button">
+            {isLoading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
 
         <div className="login-footer">
           <p>
-            🔒 Two-factor authentication via Telegram
+            🔒 Secure login
+          </p>
+          <p className="default-credentials">
+            <small>Default: @edgemadzi / admin123</small>
           </p>
         </div>
       </div>

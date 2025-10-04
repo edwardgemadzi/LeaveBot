@@ -1,8 +1,6 @@
 // API endpoint: /api/auth/login
-// Step 1: Request OTP - generates and sends OTP to Telegram
+// Simple login with username and password
 
-import { generateOTP, storeOTP, hasRecentOTP } from '../lib/otp';
-import { sendOTPToTelegram } from '../lib/telegram';
 import { getUserByUsername } from '../lib/users';
 
 export default async function handler(req: any, res: any) {
@@ -20,10 +18,10 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { telegram_username } = req.body;
+    const { telegram_username, password } = req.body;
 
-    if (!telegram_username) {
-      return res.status(400).json({ error: 'Telegram username is required' });
+    if (!telegram_username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
     }
 
     const username = telegram_username.toLowerCase().trim();
@@ -32,41 +30,27 @@ export default async function handler(req: any, res: any) {
     const user = getUserByUsername(username);
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Check if OTP was recently sent (prevent spam)
-    if (hasRecentOTP(username)) {
-      return res.status(429).json({ 
-        error: 'Please wait before requesting a new code',
-        remainingSeconds: 30 
-      });
+    // Check password (in production, use bcrypt.compare)
+    if (user.password !== password) {
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Generate OTP
-    const otp = generateOTP();
-    
-    // Store OTP
-    storeOTP(username, user.id, otp);
-
-    // Send OTP via Telegram
-    const sent = await sendOTPToTelegram(username, otp);
-
-    if (!sent) {
-      return res.status(500).json({ 
-        error: 'Could not send verification code. Please make sure you have started a conversation with the LeaveBot on Telegram by sending /start',
-        hint: 'Open Telegram and search for LeaveBot, then click Start'
-      });
-    }
+    // Simple auth token (in production, use proper JWT)
+    const token = Buffer.from(`${user.id}:${user.telegram_username}`).toString('base64');
 
     return res.json({
       success: true,
-      message: 'Verification code sent to your Telegram',
+      message: 'Login successful',
       user: {
         id: user.id,
         name: user.name,
         telegram_username: user.telegram_username,
+        role: user.role,
       },
+      token,
     });
   } catch (error) {
     console.error('Login error:', error);

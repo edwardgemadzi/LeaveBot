@@ -58,12 +58,19 @@ export default async function handler(req: any, res: any) {
       return res.status(403).json({ error: 'Only admins and supervisors can register new users' });
     }
 
-    const { name, telegram_username, role, supervisor_id } = req.body;
+    const { name, telegram_username, password, role, supervisor_id } = req.body;
 
     // Validate required fields
-    if (!name || !telegram_username || !role) {
+    if (!name || !telegram_username || !password || !role) {
       return res.status(400).json({ 
-        error: 'Name, telegram_username, and role are required' 
+        error: 'Name, telegram_username, password, and role are required' 
+      });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        error: 'Password must be at least 6 characters long' 
       });
     }
 
@@ -89,10 +96,11 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Create new user
+    // Create new user (in production, hash the password!)
     const newUser = createUser({
       name: name.trim(),
       telegram_username: telegram_username.toLowerCase().trim(),
+      password: password, // In production: await bcrypt.hash(password, 10)
       role,
       created_by: auth.userId,
       supervisor_id: supervisor_id || (auth.role === 'supervisor' ? auth.userId : undefined),

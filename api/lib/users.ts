@@ -5,6 +5,7 @@ export interface User {
   id: number;
   name: string;
   telegram_username: string;
+  password: string;
   role: 'admin' | 'supervisor' | 'team_member';
   created_by?: number;
   created_at: number;
@@ -17,6 +18,7 @@ const defaultUsers: User[] = [
     id: 1,
     name: 'Edward Gemadzi',
     telegram_username: 'edgemadzi',
+    password: 'admin123', // In production, hash this!
     role: 'admin',
     created_at: Date.now(),
   },
