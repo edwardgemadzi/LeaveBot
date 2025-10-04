@@ -3,13 +3,13 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 interface User {
   id: number;
   name: string;
-  telegram_username: string;
+  username: string;
   role: 'admin' | 'supervisor' | 'team_member';
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (telegramUsername: string) => Promise<boolean>;
+  login: (username: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;

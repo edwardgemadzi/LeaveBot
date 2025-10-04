@@ -28,7 +28,7 @@ export default async function handler(req: any, res: any) {
         { 
           id: 1, 
           name: 'Admin User', 
-          telegram_username: 'edgemadzi', 
+          username: 'edgemadzi', 
           role: 'admin', 
           shift: 'day', 
           schedule_type: 'mon_fri' 

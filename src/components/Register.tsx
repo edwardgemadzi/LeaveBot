@@ -4,7 +4,8 @@ import './Register.css';
 
 interface RegisterFormData {
   name: string;
-  telegram_username: string;
+  username: string;
+  password: string;
   role: 'admin' | 'supervisor' | 'team_member';
   supervisor_id?: number;
 }
@@ -13,7 +14,8 @@ export default function Register() {
   const { user, isAdmin, isSupervisor } = useAuth();
   const [formData, setFormData] = useState<RegisterFormData>({
     name: '',
-    telegram_username: '',
+    username: '',
+    password: '',
     role: 'team_member',
   });
   const [error, setError] = useState('');
@@ -52,12 +54,13 @@ export default function Register() {
         return;
       }
 
-      setSuccess(`User ${data.user.name} (@${data.user.telegram_username}) registered successfully as ${data.user.role}!`);
+      setSuccess(`User ${data.user.name} (@${data.user.username}) registered successfully as ${data.user.role}!`);
       
       // Reset form
       setFormData({
         name: '',
-        telegram_username: '',
+        username: '',
+        password: '',
         role: 'team_member',
       });
     } catch (err) {
@@ -107,14 +110,14 @@ export default function Register() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="telegram_username">Telegram Username</label>
+            <label htmlFor="username">Username</label>
             <div className={`input-wrapper ${isLoading ? 'disabled' : ''}`}>
               <span className="input-prefix">@</span>
               <input
-                id="telegram_username"
+                id="username"
                 type="text"
-                value={formData.telegram_username}
-                onChange={(e) => handleChange('telegram_username', e.target.value)}
+                value={formData.username}
+                onChange={(e) => handleChange('username', e.target.value)}
                 placeholder="username"
                 disabled={isLoading}
                 required
@@ -123,6 +126,20 @@ export default function Register() {
             <small className="input-hint">
               Without the @ symbol
             </small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => handleChange('password', e.target.value)}
+              placeholder="Min 6 characters"
+              minLength={6}
+              disabled={isLoading}
+              required
+            />
           </div>
 
           <div className="form-group">

@@ -33,7 +33,7 @@ export default async function handler(req: any, res: any) {
     const employees = users.map(user => ({
       id: user.id,
       name: user.name,
-      telegram_username: user.telegram_username,
+      username: user.username,
       role: user.role,
       shift: 'day',
       schedule_type: 'mon_fri',
