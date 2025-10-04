@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { users, JWT_SECRET, addUser, getUserByUsername, initializeAdmin } from './shared/storage.js';
+import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin } from './shared/mongodb-storage.js';
 
 // Initialize admin on cold start
 initializeAdmin();
@@ -61,29 +61,25 @@ export default async function handler(req, res) {
   const { username: validUsername, password: validPassword, name: validName } = validation.data;
   
   // Check if user already exists
-  const existingUser = getUserByUsername(validUsername);
+  const existingUser = await getUserByUsername(validUsername);
   if (existingUser) {
     return res.status(409).json({ error: 'Username already exists' });
   }
   
-  // If this is the first user, make them admin
-  const isFirstUser = users.length === 0;
-  
   // Hash password
   const passwordHash = await bcrypt.hash(validPassword, 10);
   
-  // Create user using helper
-  const newUser = addUser({
+  // Create user using helper (will auto-assign admin if first user)
+  const newUser = await addUser({
     username: validUsername,
     passwordHash,
-    name: validName,
-    role: isFirstUser ? 'admin' : 'user'
+    name: validName
   });
   
   // Generate JWT token
   const token = jwt.sign(
     { 
-      id: newUser.id, 
+      id: newUser._id, 
       username: newUser.username, 
       role: newUser.role 
     },
@@ -94,12 +90,12 @@ export default async function handler(req, res) {
   return res.json({
     success: true,
     user: { 
-      id: newUser.id, 
+      id: newUser._id, 
       username: newUser.username, 
       name: newUser.name, 
       role: newUser.role 
     },
     token,
-    message: isFirstUser ? 'First user created as admin' : 'User registered successfully'
+    message: newUser.role === 'admin' ? 'First user created as admin' : 'User registered successfully'
   });
 }

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { users, JWT_SECRET, initializeAdmin } from './shared/storage.js';
+import { JWT_SECRET, getUserByUsername, initializeAdmin } from './shared/mongodb-storage.js';
 
 // Initialize admin on cold start
 initializeAdmin();
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
   }
   
   // Find user
-  const user = users.find(u => u.username === username);
+  const user = await getUserByUsername(username);
   
   if (!user) {
     // Prevent username enumeration - same delay as password check

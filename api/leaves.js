@@ -1,8 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from './shared/storage.js';
-
-// Leave requests storage
-const leaves = [];
+import { JWT_SECRET, getAllLeaves, addLeaveRequest } from './shared/mongodb-storage.js';
 
 // Authentication middleware
 function authenticateToken(req) {
@@ -52,7 +49,7 @@ function validateLeaveRequest(data) {
   return { valid: true, data: sanitizedData };
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   // Security headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -71,10 +68,8 @@ export default function handler(req, res) {
 
   if (req.method === 'GET') {
     // Users can only see their own leaves (unless admin)
-    const userLeaves = auth.user.role === 'admin' 
-      ? leaves 
-      : leaves.filter(l => l.userId === auth.user.id);
-    return res.json({ leaves: userLeaves });
+    const leaves = await getAllLeaves(auth.user.id, auth.user.role);
+    return res.json({ leaves });
   }
 
   if (req.method === 'POST') {
@@ -86,19 +81,16 @@ export default function handler(req, res) {
     
     const { employeeName, startDate, endDate, reason } = validation.data;
     
-    const newLeave = {
-      id: leaves.length + 1,
+    const leaveData = {
       userId: auth.user.id,
       username: auth.user.username,
       employeeName,
       startDate,
       endDate,
-      reason,
-      status: 'pending',
-      createdAt: new Date().toISOString()
+      reason
     };
     
-    leaves.push(newLeave);
+    const newLeave = await addLeaveRequest(leaveData);
     return res.json({ success: true, leave: newLeave });
   }
 
