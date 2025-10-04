@@ -1,27 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { users, JWT_SECRET, addUser, getUserByUsername, initializeAdmin } from './shared/storage.js';
 
-// In-memory user storage (use database in production)
-const users = [];
-
-// JWT secret (MUST be set as environment variable)
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-immediately';
-
-// Check if initial admin should be created from environment
-if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
-  const existingAdmin = users.find(u => u.username === process.env.ADMIN_USERNAME);
-  if (!existingAdmin) {
-    const passwordHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10);
-    users.push({
-      id: 1,
-      username: process.env.ADMIN_USERNAME,
-      passwordHash,
-      name: process.env.ADMIN_NAME || 'Administrator',
-      role: 'admin'
-    });
-    console.log('✅ Initial admin user created from environment variables');
-  }
-}
+// Initialize admin on cold start
+initializeAdmin();
 
 // Input validation
 function validateUserInput(data) {
@@ -79,7 +61,7 @@ export default async function handler(req, res) {
   const { username: validUsername, password: validPassword, name: validName } = validation.data;
   
   // Check if user already exists
-  const existingUser = users.find(u => u.username === validUsername);
+  const existingUser = getUserByUsername(validUsername);
   if (existingUser) {
     return res.status(409).json({ error: 'Username already exists' });
   }
@@ -90,16 +72,13 @@ export default async function handler(req, res) {
   // Hash password
   const passwordHash = await bcrypt.hash(validPassword, 10);
   
-  // Create user
-  const newUser = {
-    id: users.length + 1,
+  // Create user using helper
+  const newUser = addUser({
     username: validUsername,
     passwordHash,
     name: validName,
     role: isFirstUser ? 'admin' : 'user'
-  };
-  
-  users.push(newUser);
+  });
   
   // Generate JWT token
   const token = jwt.sign(

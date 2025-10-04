@@ -1,10 +1,8 @@
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from './shared/storage.js';
 
 // Leave requests storage
 const leaves = [];
-
-// JWT secret (must match login.js)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 
 // Authentication middleware
 function authenticateToken(req) {
