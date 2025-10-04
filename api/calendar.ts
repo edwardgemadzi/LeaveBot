@@ -1,5 +1,13 @@
 // API endpoint: /api/calendar
 
+function validateAuth(req: any): boolean {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return false;
+  }
+  return true;
+}
+
 export default async function handler(req: any, res: any) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,6 +16,11 @@ export default async function handler(req: any, res: any) {
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Check authentication
+  if (!validateAuth(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   if (req.method === 'GET') {

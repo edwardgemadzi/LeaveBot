@@ -3,10 +3,13 @@ import type { Employee, LeaveRequest, CalendarDay } from "./types";
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('leavebot_token');
+  
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });

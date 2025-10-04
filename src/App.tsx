@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "./contexts/AuthContext";
+import Login from "./components/Login";
 import Calendar from "./components/Calendar.js";
 import LeaveRequestForm from "./components/LeaveRequestForm.js";
 import PendingRequests from "./components/PendingRequests.js";
@@ -7,14 +9,17 @@ import { api } from "./api";
 import "./App.css";
 
 function App() {
+  const { user, logout, isAuthenticated, isAdmin, isSupervisor } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    loadData();
-  }, [refreshKey]);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [refreshKey, isAuthenticated]);
 
   async function loadData() {
     try {
@@ -45,10 +50,27 @@ function App() {
     );
   }
 
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
   return (
     <div className="app">
       <header className="app-header">
-        <h1>🗓️ LeaveBot - Employee Leave Management</h1>
+        <div className="header-content">
+          <h1>🗓️ LeaveBot - Employee Leave Management</h1>
+          <div className="header-user">
+            <span className="user-info">
+              👤 <strong>{user?.name}</strong>
+              {isAdmin && <span className="badge admin">Admin</span>}
+              {isSupervisor && !isAdmin && <span className="badge supervisor">Supervisor</span>}
+            </span>
+            <button onClick={logout} className="logout-button">
+              Logout
+            </button>
+          </div>
+        </div>
       </header>
 
       <main className="app-main">
@@ -61,7 +83,11 @@ function App() {
 
         <div className="forms-section">
           <LeaveRequestForm employees={employees} onSuccess={handleRefresh} />
-          <PendingRequests requests={requests} onApprove={handleRefresh} />
+          
+          {/* Only admins and supervisors can see pending requests */}
+          {isSupervisor && (
+            <PendingRequests requests={requests} onApprove={handleRefresh} />
+          )}
         </div>
       </main>
     </div>
