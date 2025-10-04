@@ -1,21 +1,29 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// Secure password storage using bcrypt hashes
-// Password: admin123 (hashed with bcrypt)
-const users = [
-  { 
-    id: 1, 
-    username: 'edgemadzi', 
-    // bcrypt hash of 'admin123'
-    passwordHash: '$2a$10$8K1p/a0dL3LkkPzSs/T3GOu7IqxYpU0Zy0qQZvzNqZNMkWXLrQGRW',
-    name: 'Edward Gemadzi', 
-    role: 'admin' 
-  }
-];
+// In-memory user storage (use database in production)
+// NO HARDCODED PASSWORDS - Users must register via /api/register
+const users = [];
 
-// JWT secret (in production, use environment variable)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+// JWT secret (MUST be set as environment variable)
+const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-immediately';
+
+// Optional: Create initial admin from environment variables
+// Set ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_NAME in Vercel environment
+if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
+  const existingAdmin = users.find(u => u.username === process.env.ADMIN_USERNAME);
+  if (!existingAdmin) {
+    const passwordHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10);
+    users.push({
+      id: 1,
+      username: process.env.ADMIN_USERNAME,
+      passwordHash,
+      name: process.env.ADMIN_NAME || 'Administrator',
+      role: 'admin'
+    });
+    console.log('✅ Initial admin user created from environment variables');
+  }
+}
 
 // Rate limiting (simple in-memory implementation)
 const loginAttempts = new Map();
