@@ -29,7 +29,7 @@ async function getChatIdByUsername(username: string): Promise<number | null> {
     // Try to get updates to find the user's chat_id
     // Note: This only works if the user has interacted with the bot before
     const response = await fetch(`${TELEGRAM_API}/getUpdates?limit=100`);
-    const data = await response.json();
+    const data: any = await response.json();
 
     if (data.ok && data.result) {
       for (const update of data.result) {
@@ -72,7 +72,7 @@ export async function sendOTPToTelegram(username: string, otp: string): Promise<
       }),
     });
 
-    const result = await response.json();
+    const result: any = await response.json();
     return result.ok;
   } catch (error) {
     console.error('Error sending OTP to Telegram:', error);
