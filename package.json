@@ -1,0 +1,21 @@
+{
+  "name": "leavebot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "server",
+    "client",
+    "bot"
+  ],
+  "scripts": {
+    "test": "npm --workspaces run test",
+    "build": "npm --workspaces run build",
+    "lint": "npm --workspaces run lint",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "tsx": "^4.20.6"
+  }
+}
