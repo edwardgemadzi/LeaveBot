@@ -1,5 +1,7 @@
 // API endpoint: /api/employees
 
+import { getAllUsers } from './_lib/users';
+
 function validateAuth(req: any): boolean {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -25,34 +27,19 @@ export default async function handler(req: any, res: any) {
   }
 
   if (req.method === 'GET') {
-    return res.json({
-      employees: [
-        { 
-          id: 1, 
-          name: 'Edward Gemadzi', 
-          telegram_username: 'edgemadzi', 
-          role: 'admin', 
-          shift: 'day', 
-          schedule_type: 'mon_fri' 
-        },
-        { 
-          id: 2, 
-          name: 'Team Member 1', 
-          telegram_username: 'teammember1', 
-          role: 'team_member', 
-          shift: 'day', 
-          schedule_type: 'mon_fri' 
-        },
-        { 
-          id: 3, 
-          name: 'Team Member 2', 
-          telegram_username: 'teammember2', 
-          role: 'team_member', 
-          shift: 'day', 
-          schedule_type: 'mon_fri' 
-        }
-      ]
-    });
+    const users = getAllUsers();
+    
+    // Format users as employees
+    const employees = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      telegram_username: user.telegram_username,
+      role: user.role,
+      shift: 'day',
+      schedule_type: 'mon_fri',
+    }));
+    
+    return res.json({ employees });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

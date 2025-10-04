@@ -50,7 +50,7 @@ git push -u origin main
    - Add these variables:
    
    ```
-   TELEGRAM_BOT_TOKEN=8277269900:AAEPvAuRszD7fnRxfoUPlYla-ZXAtI4FUQI
+   TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
    ADMIN_USERNAME=edgemadzi
    NODE_ENV=production
    ```
@@ -79,7 +79,7 @@ Then set environment variables:
 
 ```bash
 vercel env add TELEGRAM_BOT_TOKEN
-# Paste: 8277269900:AAEPvAuRszD7fnRxfoUPlYla-ZXAtI4FUQI
+# Paste: your_bot_token_from_botfather
 
 vercel env add ADMIN_USERNAME
 # Paste: edgemadzi

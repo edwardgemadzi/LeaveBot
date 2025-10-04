@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./components/Login";
+import Register from "./components/Register";
 import Calendar from "./components/Calendar.js";
 import LeaveRequestForm from "./components/LeaveRequestForm.js";
 import PendingRequests from "./components/PendingRequests.js";
@@ -10,6 +11,7 @@ import "./App.css";
 
 function App() {
   const { user, logout, isAuthenticated, isAdmin, isSupervisor } = useAuth();
+  const [currentView, setCurrentView] = useState<'dashboard' | 'register'>('dashboard');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
@@ -55,6 +57,35 @@ function App() {
     return <Login />;
   }
 
+  // Show registration page if admin/supervisor wants to register users
+  if (currentView === 'register') {
+    return (
+      <div className="app">
+        <header className="app-header">
+          <div className="header-content">
+            <h1>🗓️ LeaveBot - Employee Leave Management</h1>
+            <div className="header-user">
+              <span className="user-info">
+                👤 <strong>{user?.name}</strong>
+                {isAdmin && <span className="badge admin">Admin</span>}
+                {isSupervisor && !isAdmin && <span className="badge supervisor">Supervisor</span>}
+              </span>
+              <button onClick={() => setCurrentView('dashboard')} className="nav-button">
+                ← Back to Dashboard
+              </button>
+              <button onClick={logout} className="logout-button">
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+        <main className="app-main">
+          <Register />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -66,6 +97,11 @@ function App() {
               {isAdmin && <span className="badge admin">Admin</span>}
               {isSupervisor && !isAdmin && <span className="badge supervisor">Supervisor</span>}
             </span>
+            {(isAdmin || isSupervisor) && (
+              <button onClick={() => setCurrentView('register')} className="nav-button">
+                + Register User
+              </button>
+            )}
             <button onClick={logout} className="logout-button">
               Logout
             </button>

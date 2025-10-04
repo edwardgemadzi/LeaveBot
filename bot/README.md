@@ -40,7 +40,7 @@ Create or update `.env` file:
 
 ```properties
 # Get your token from @BotFather on Telegram
-TELEGRAM_BOT_TOKEN=8277269900:AAEPvAuRszD7fnRxfoUPlYla-ZXAtI4FUQI
+TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
 
 # API URL - Point to your deployed API
 API_BASE_URL=http://localhost:5001/api

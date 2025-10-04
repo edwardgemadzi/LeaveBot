@@ -36,26 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (telegramUsername: string): Promise<boolean> => {
     try {
-      // Remove @ if user includes it
-      const username = telegramUsername.replace('@', '').toLowerCase();
+      // Check if we already have user data in localStorage
+      // (this would be set after OTP verification)
+      const savedUser = localStorage.getItem('leavebot_user');
+      const savedToken = localStorage.getItem('leavebot_token');
       
-      // Call API to validate user
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegram_username: username }),
-      });
-
-      if (!response.ok) {
-        return false;
-      }
-
-      const data = await response.json();
-      
-      if (data.user) {
-        setUser(data.user);
-        localStorage.setItem('leavebot_user', JSON.stringify(data.user));
-        localStorage.setItem('leavebot_token', data.token || username);
+      if (savedUser && savedToken) {
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
         return true;
       }
       
