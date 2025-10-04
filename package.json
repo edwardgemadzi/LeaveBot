@@ -10,7 +10,8 @@
   ],
   "scripts": {
     "dev": "npm --workspace=client run dev",
-    "build": "npm --workspace=client run build && npm --workspace=server run build",
+    "build": "npm --workspace=client run build && npm --workspace=server run build && npm run postbuild",
+    "postbuild": "rm -rf dist && cp -r client/dist dist",
     "test": "npm --workspaces run test",
     "lint": "npm --workspaces run lint",
     "format": "prettier --write ."
