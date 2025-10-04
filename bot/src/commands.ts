@@ -78,6 +78,7 @@ ${roleEmoji} *Role:* ${employee.role}
 *Available Commands:*
 /help - Show this help message
 /book - Book leave days for yourself
+/calendar - View team calendar for current month
 /status - Check all leave requests${employee.role === "admin" ? "\n/approve - Approve pending requests (admin)" : ""}${supervisorCommands}
 
 Get started by typing /book to request leave!
@@ -560,6 +561,87 @@ export async function handleMakeSupervisor(bot: TelegramBot, msg: Message) {
     await bot.sendMessage(
       chatId,
       `❌ Error: ${error instanceof Error ? error.message : "Failed to promote user"}`
+    );
+  }
+}
+
+export async function handleCalendar(bot: TelegramBot, msg: Message) {
+  const chatId = msg.chat.id;
+
+  try {
+    // Get current month date range
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0);
+    
+    const startDateStr = startDate.toISOString().slice(0, 10);
+    const endDateStr = endDate.toISOString().slice(0, 10);
+
+    // Fetch calendar data
+    const { calendar } = await apiCall<{ calendar: any[] }>(
+      `/calendar?startDate=${startDateStr}&endDate=${endDateStr}`
+    );
+
+    // Format calendar as text
+    const monthName = startDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    let calendarText = `📅 *${monthName} Calendar*\n\n`;
+
+    // Group days by week
+    let weekDays: string[] = [];
+    let currentWeek = 0;
+
+    calendar.forEach((day: any) => {
+      const date = new Date(day.date);
+      const dayOfWeek = date.getDay();
+      const weekOfMonth = Math.floor((date.getDate() - 1) / 7);
+
+      // Start a new week
+      if (weekOfMonth !== currentWeek) {
+        if (weekDays.length > 0) {
+          calendarText += weekDays.join(' ') + '\n';
+          weekDays = [];
+        }
+        currentWeek = weekOfMonth;
+      }
+
+      const dayNum = date.getDate().toString().padStart(2, '0');
+      const isWeekend = !day.isWorkday;
+      
+      let dayStatus = '';
+      if (day.status === 'approved') {
+        dayStatus = '🔴'; // Red for approved leave
+      } else if (day.status === 'pending') {
+        dayStatus = '🟡'; // Yellow for pending
+      } else if (isWeekend) {
+        dayStatus = '⬜'; // Grey for weekend
+      } else {
+        dayStatus = '✅'; // Green for available
+      }
+
+      weekDays.push(`${dayStatus}${dayNum}`);
+    });
+
+    // Add last week
+    if (weekDays.length > 0) {
+      calendarText += weekDays.join(' ') + '\n';
+    }
+
+    calendarText += `\n*Legend:*\n`;
+    calendarText += `✅ Available\n`;
+    calendarText += `🔴 On Leave (Approved)\n`;
+    calendarText += `🟡 Pending Approval\n`;
+    calendarText += `⬜ Weekend\n\n`;
+    calendarText += `🌐 View full calendar: ${API_BASE.replace('/api', '')}`;
+
+    await bot.sendMessage(chatId, calendarText, { parse_mode: "Markdown" });
+  } catch (error) {
+    console.error("Error in handleCalendar:", error);
+    await bot.sendMessage(
+      chatId,
+      `❌ Error: ${error instanceof Error ? error.message : "Failed to fetch calendar"}`
     );
   }
 }

@@ -9,7 +9,8 @@ import {
   handleTeam,
   handleAddMember,
   handleSetSchedule,
-  handleMakeSupervisor
+  handleMakeSupervisor,
+  handleCalendar
 } from "./commands";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -35,6 +36,7 @@ bot.onText(/\/team/, (msg) => handleTeam(bot, msg));
 bot.onText(/\/addmember/, (msg) => handleAddMember(bot, msg));
 bot.onText(/\/setschedule/, (msg) => handleSetSchedule(bot, msg));
 bot.onText(/\/makesupervisor/, (msg) => handleMakeSupervisor(bot, msg));
+bot.onText(/\/calendar/, (msg) => handleCalendar(bot, msg));
 
 // Error handling
 bot.on("polling_error", (error) => {
