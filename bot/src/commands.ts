@@ -21,7 +21,47 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-// Register or get employee by Telegram username
+// Check if user is registered and return their info
+async function checkUser(msg: Message): Promise<{
+  registered: boolean;
+  user?: {
+    id: number;
+    name: string;
+    telegram_username: string;
+    role: string;
+    supervisor_id?: number;
+  };
+  message: string;
+  hint?: string;
+  web_app_url?: string;
+}> {
+  const username = msg.from?.username;
+  const firstName = msg.from?.first_name || "User";
+  const lastName = msg.from?.last_name || "";
+  const fullName = `${firstName} ${lastName}`.trim();
+  const chatId = msg.chat.id;
+
+  if (!username) {
+    throw new Error("You need a Telegram username to use this bot. Please set one in Telegram settings.");
+  }
+
+  const result = await apiCall<any>(
+    "/telegram/check-user",
+    {
+      method: "POST",
+      body: JSON.stringify({ 
+        telegram_username: username, 
+        chat_id: chatId,
+        first_name: firstName,
+        last_name: lastName 
+      }),
+    }
+  );
+
+  return result;
+}
+
+// Legacy function - kept for backward compatibility
 async function registerUser(msg: Message): Promise<{ 
   id: number; 
   name: string;
@@ -54,41 +94,112 @@ function isAdmin(msg: Message): boolean {
   return msg.from?.username === ADMIN_USERNAME;
 }
 
+// Helper function to verify user is registered before executing commands
+async function requireRegistration(bot: TelegramBot, msg: Message): Promise<boolean> {
+  try {
+    const result = await checkUser(msg);
+    
+    if (!result.registered) {
+      await bot.sendMessage(
+        msg.chat.id,
+        `⚠️ You need to be registered to use this command.\n\nPlease send /start for registration instructions.`
+      );
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    await bot.sendMessage(
+      msg.chat.id,
+      `❌ Error checking registration status. Please try /start first.`
+    );
+    return false;
+  }
+}
+
 export async function handleStart(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
+  const username = msg.from?.username || "Unknown";
   
   try {
-    const employee = await registerUser(msg);
-    const isSupervisorOrAdmin = employee.role === "admin" || employee.role === "supervisor";
-    const roleEmoji = employee.role === "admin" ? "🔑" : employee.role === "supervisor" ? "👔" : "👤";
+    const result = await checkUser(msg);
+    
+    if (!result.registered) {
+      // User not registered - show registration instructions
+      const notRegisteredMessage = `
+👋 Hello, @${username}!
+
+⚠️ *You are not registered in the LeaveBot system yet.*
+
+To use this bot, you need to be registered by an administrator.
+
+*How to get registered:*
+
+1️⃣ *If you're an admin:*
+   Visit ${result.web_app_url}
+   Login and register yourself
+
+2️⃣ *If you're a team member:*
+   Ask your supervisor or administrator to:
+   • Visit ${result.web_app_url}
+   • Login to the system
+   • Click "+ Register User"
+   • Add your details with username: @${username}
+
+3️⃣ *Once registered:*
+   Come back here and send /start again!
+
+❓ *Need help?* Contact your administrator.
+      `;
+
+      await bot.sendMessage(chatId, notRegisteredMessage, { parse_mode: "Markdown" });
+      return;
+    }
+
+    // User is registered - show welcome message with their info
+    const user = result.user!;
+    const isSupervisorOrAdmin = user.role === "admin" || user.role === "supervisor";
+    const roleEmoji = user.role === "admin" ? "🔑" : user.role === "supervisor" ? "👔" : "👤";
     
     const supervisorCommands = isSupervisorOrAdmin
-      ? `\n/team - View your team members
+      ? `
+*Team Management:*
+/team - View your team members
 /addmember - Add a member to your team
-/setschedule - Configure member's schedule\n`
+/setschedule - Configure member's schedule
+`
+      : "";
+
+    const adminCommands = user.role === "admin"
+      ? `
+*Admin Commands:*
+/approve - Approve pending requests
+`
       : "";
     
     const welcomeMessage = `
-👋 Welcome to LeaveBot, ${employee.name}!
+👋 Welcome back, ${user.name}!
 
-${roleEmoji} *Role:* ${employee.role}
-⏰ *Shift:* ${employee.shift}
-📅 *Schedule:* ${employee.scheduleType}
+${roleEmoji} *Role:* ${user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+� *Username:* @${user.telegram_username}
 
-*Available Commands:*
-/help - Show this help message
-/book - Book leave days for yourself
-/calendar - View team calendar for current month
-/status - Check all leave requests${employee.role === "admin" ? "\n/approve - Approve pending requests (admin)" : ""}${supervisorCommands}
+*🗓️ Leave Management:*
+/book - Request leave days
+/calendar - View team calendar
+/status - Check your leave requests
+${adminCommands}${supervisorCommands}
+/help - Show this message again
+
+🌐 *Web Portal:* ${result.web_app_url}
 
 Get started by typing /book to request leave!
-  `;
+    `;
 
     await bot.sendMessage(chatId, welcomeMessage, { parse_mode: "Markdown" });
   } catch (error) {
     await bot.sendMessage(
       chatId,
-      `❌ Error: ${error instanceof Error ? error.message : "Failed to register"}`
+      `❌ Error: ${error instanceof Error ? error.message : "Failed to check registration status"}\n\nPlease try again or contact your administrator.`
     );
   }
 }
@@ -100,8 +211,18 @@ export async function handleHelp(bot: TelegramBot, msg: Message) {
 export async function handleBook(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
 
+  // Check if user is registered first
+  if (!(await requireRegistration(bot, msg))) {
+    return;
+  }
+
   try {
-    const employee = await registerUser(msg);
+    const result = await checkUser(msg);
+    if (!result.registered || !result.user) {
+      return; // Already handled by requireRegistration
+    }
+
+    const employee = result.user;
     const text = msg.text || "";
     const parts = text.split(" ").slice(1);
 
@@ -567,6 +688,11 @@ export async function handleMakeSupervisor(bot: TelegramBot, msg: Message) {
 
 export async function handleCalendar(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
+
+  // Check if user is registered first
+  if (!(await requireRegistration(bot, msg))) {
+    return;
+  }
 
   try {
     // Get current month date range
