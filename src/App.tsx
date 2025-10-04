@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
   const [user, setUser] = useState<any>(null)
+  const [token, setToken] = useState<string>('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [leaves, setLeaves] = useState<any[]>([])
@@ -10,52 +11,127 @@ function App() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  // Load user from localStorage on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token')
+    const savedUser = localStorage.getItem('user')
+    if (savedToken && savedUser) {
+      setToken(savedToken)
+      setUser(JSON.parse(savedUser))
+      loadLeaves(savedToken)
+    }
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    })
-    const data = await res.json()
-    if (data.success) {
-      setUser(data.user)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      loadLeaves()
-    } else {
-      alert(data.error)
+    setError('')
+    setLoading(true)
+    
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      const data = await res.json()
+      
+      if (data.success) {
+        setUser(data.user)
+        setToken(data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        localStorage.setItem('token', data.token)
+        setPassword('') // Clear password from memory
+        loadLeaves(data.token)
+      } else {
+        setError(data.error || 'Login failed')
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  async function loadLeaves() {
-    const res = await fetch('/api/leaves')
-    const data = await res.json()
-    setLeaves(data.leaves)
+  async function loadLeaves(authToken?: string) {
+    const tkn = authToken || token
+    if (!tkn) return
+    
+    try {
+      const res = await fetch('/api/leaves', {
+        headers: { 
+          'Authorization': `Bearer ${tkn}`
+        }
+      })
+      const data = await res.json()
+      
+      if (res.status === 401) {
+        // Token expired or invalid
+        handleLogout()
+        setError('Session expired. Please login again.')
+        return
+      }
+      
+      setLeaves(data.leaves || [])
+    } catch (err) {
+      setError('Failed to load leave requests')
+    }
   }
 
   async function handleSubmitLeave(e: React.FormEvent) {
     e.preventDefault()
-    const res = await fetch('/api/leaves', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeName, startDate, endDate, reason })
-    })
-    const data = await res.json()
-    if (data.success) {
-      alert('Leave request submitted!')
-      setEmployeeName('')
-      setStartDate('')
-      setEndDate('')
-      setReason('')
-      loadLeaves()
+    setError('')
+    setLoading(true)
+    
+    try {
+      const res = await fetch('/api/leaves', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ employeeName, startDate, endDate, reason })
+      })
+      const data = await res.json()
+      
+      if (res.status === 401) {
+        handleLogout()
+        setError('Session expired. Please login again.')
+        return
+      }
+      
+      if (data.success) {
+        alert('Leave request submitted!')
+        setEmployeeName('')
+        setStartDate('')
+        setEndDate('')
+        setReason('')
+        loadLeaves()
+      } else {
+        setError(data.error || 'Failed to submit leave request')
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  function handleLogout() {
+    setUser(null)
+    setToken('')
+    setLeaves([])
+    localStorage.removeItem('user')
+    localStorage.removeItem('token')
   }
 
   if (!user) {
     return (
       <div style={{maxWidth:'400px',margin:'100px auto',padding:'20px'}}>
         <h1>LeaveBot Login</h1>
+        {error && <div style={{padding:'10px',background:'#f8d7da',color:'#721c24',borderRadius:'5px',marginBottom:'10px'}}>{error}</div>}
         <form onSubmit={handleLogin}>
           <input 
             type="text" 
@@ -63,6 +139,8 @@ function App() {
             value={username}
             onChange={e=>setUsername(e.target.value)}
             style={{width:'100%',padding:'10px',margin:'10px 0'}}
+            required
+            disabled={loading}
           />
           <input 
             type="password" 
@@ -70,12 +148,18 @@ function App() {
             value={password}
             onChange={e=>setPassword(e.target.value)}
             style={{width:'100%',padding:'10px',margin:'10px 0'}}
+            required
+            disabled={loading}
           />
-          <button type="submit" style={{width:'100%',padding:'10px',background:'#007bff',color:'white',border:'none',cursor:'pointer'}}>
-            Login
+          <button 
+            type="submit" 
+            style={{width:'100%',padding:'10px',background:loading?'#6c757d':'#007bff',color:'white',border:'none',cursor:loading?'not-allowed':'pointer'}}
+            disabled={loading}
+          >
+            {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        <p style={{fontSize:'12px',marginTop:'20px'}}>Default: edgemadzi / admin123</p>
+        <p style={{fontSize:'12px',marginTop:'20px',color:'#666'}}>Default: edgemadzi / admin123</p>
       </div>
     )
   }
@@ -84,10 +168,12 @@ function App() {
     <div style={{maxWidth:'800px',margin:'0 auto',padding:'20px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <h1>LeaveBot - Welcome {user.name}!</h1>
-        <button onClick={()=>{setUser(null);localStorage.removeItem('user')}} style={{padding:'10px 20px',background:'#dc3545',color:'white',border:'none',cursor:'pointer'}}>
+        <button onClick={handleLogout} style={{padding:'10px 20px',background:'#dc3545',color:'white',border:'none',cursor:'pointer'}}>
           Logout
         </button>
       </div>
+
+      {error && <div style={{padding:'10px',background:'#f8d7da',color:'#721c24',borderRadius:'5px',margin:'20px 0'}}>{error}</div>}
 
       <div style={{marginTop:'30px'}}>
         <h2>Request Leave</h2>
@@ -99,6 +185,7 @@ function App() {
             onChange={e=>setEmployeeName(e.target.value)}
             style={{width:'100%',padding:'10px',margin:'10px 0'}}
             required
+            disabled={loading}
           />
           <input 
             type="date" 
@@ -107,6 +194,7 @@ function App() {
             onChange={e=>setStartDate(e.target.value)}
             style={{width:'100%',padding:'10px',margin:'10px 0'}}
             required
+            disabled={loading}
           />
           <input 
             type="date" 
@@ -115,15 +203,21 @@ function App() {
             onChange={e=>setEndDate(e.target.value)}
             style={{width:'100%',padding:'10px',margin:'10px 0'}}
             required
+            disabled={loading}
           />
           <textarea 
             placeholder="Reason (optional)" 
             value={reason}
             onChange={e=>setReason(e.target.value)}
             style={{width:'100%',padding:'10px',margin:'10px 0',minHeight:'80px'}}
+            disabled={loading}
           />
-          <button type="submit" style={{padding:'10px 20px',background:'#28a745',color:'white',border:'none',cursor:'pointer'}}>
-            Submit Request
+          <button 
+            type="submit" 
+            style={{padding:'10px 20px',background:loading?'#6c757d':'#28a745',color:'white',border:'none',cursor:loading?'not-allowed':'pointer'}}
+            disabled={loading}
+          >
+            {loading ? 'Submitting...' : 'Submit Request'}
           </button>
         </form>
       </div>
