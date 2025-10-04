@@ -146,7 +146,7 @@ export default function Login() {
           <form onSubmit={handleUsernameSubmit} className="login-form">
             <div className="form-group">
               <label htmlFor="username">Telegram Username</label>
-              <div className="input-wrapper">
+              <div className={`input-wrapper ${isLoading ? 'disabled' : ''}`}>
                 <span className="input-prefix">@</span>
                 <input
                   id="username"

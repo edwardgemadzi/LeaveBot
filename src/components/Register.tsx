@@ -108,7 +108,7 @@ export default function Register() {
 
           <div className="form-group">
             <label htmlFor="telegram_username">Telegram Username</label>
-            <div className="input-wrapper">
+            <div className={`input-wrapper ${isLoading ? 'disabled' : ''}`}>
               <span className="input-prefix">@</span>
               <input
                 id="telegram_username"
