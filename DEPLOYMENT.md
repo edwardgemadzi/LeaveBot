@@ -21,9 +21,14 @@ Add these variables:
 
 #### Required:
 ```bash
-MONGODB_URI=mongodb+srv://leavebot:9qGsGyP1btSulfF8@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/leavebot?retryWrites=true&w=majority
 
-JWT_SECRET=0f9OBraUVEirfoYezCvxKkA0sqmLl1tzeB/DS+r815A=
+JWT_SECRET=<generate-with-openssl-rand-base64-32>
+```
+
+**Generate JWT Secret:**
+```bash
+openssl rand -base64 32
 ```
 
 #### Optional (for initial admin user):
