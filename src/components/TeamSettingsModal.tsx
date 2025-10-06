@@ -7,25 +7,6 @@ interface TeamSettingsModalProps {
     _id: string
     name: string
     settings?: {
-      shiftPattern: {
-        type: string
-        customPattern?: string
-        referenceDate?: string
-      }
-      shiftTime: {
-        type: string
-        customStart?: string
-        customEnd?: string
-      }
-      workingDays: {
-        monday: boolean
-        tuesday: boolean
-        wednesday: boolean
-        thursday: boolean
-        friday: boolean
-        saturday: boolean
-        sunday: boolean
-      }
       concurrentLeave: {
         enabled: boolean
         maxPerTeam: number
@@ -33,6 +14,27 @@ interface TeamSettingsModalProps {
         checkByShift: boolean
       }
       annualLeaveDays: number
+      defaults?: {
+        shiftPattern: {
+          type: string
+          customPattern?: string
+          referenceDate?: string
+        }
+        shiftTime: {
+          type: string
+          customStart?: string
+          customEnd?: string
+        }
+        workingDays: {
+          monday: boolean
+          tuesday: boolean
+          wednesday: boolean
+          thursday: boolean
+          friday: boolean
+          saturday: boolean
+          sunday: boolean
+        }
+      }
     }
   }
   token: string
@@ -40,36 +42,38 @@ interface TeamSettingsModalProps {
 }
 
 const defaultSettings = {
-  shiftPattern: {
-    type: 'regular',
-    customPattern: '',
-    referenceDate: new Date().toISOString().split('T')[0]
-  },
-  shiftTime: {
-    type: 'day',
-    customStart: '08:00',
-    customEnd: '17:00'
-  },
-  workingDays: {
-    monday: true,
-    tuesday: true,
-    wednesday: true,
-    thursday: true,
-    friday: true,
-    saturday: false,
-    sunday: false
-  },
   concurrentLeave: {
     enabled: false,
     maxPerTeam: 3,
     maxPerShift: 2,
     checkByShift: false
   },
-  annualLeaveDays: 21
+  annualLeaveDays: 21,
+  defaults: {
+    shiftPattern: {
+      type: 'regular',
+      customPattern: '',
+      referenceDate: new Date().toISOString().split('T')[0]
+    },
+    shiftTime: {
+      type: 'day',
+      customStart: '08:00',
+      customEnd: '17:00'
+    },
+    workingDays: {
+      monday: true,
+      tuesday: true,
+      wednesday: true,
+      thursday: true,
+      friday: true,
+      saturday: false,
+      sunday: false
+    }
+  }
 }
 
 export default function TeamSettingsModal({ isOpen, onClose, team, token, onSuccess }: TeamSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'shift' | 'time' | 'days' | 'limits' | 'annual'>('shift')
+  const [activeTab, setActiveTab] = useState<'limits' | 'annual' | 'defaults'>('limits')
   const [settings, setSettings] = useState(team.settings || defaultSettings)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -80,7 +84,7 @@ export default function TeamSettingsModal({ isOpen, onClose, team, token, onSucc
       setSettings(team.settings || defaultSettings)
       setError('')
       setSuccess('')
-      setActiveTab('shift')
+      setActiveTab('limits')
     }
   }, [isOpen, team])
 
@@ -96,7 +100,11 @@ export default function TeamSettingsModal({ isOpen, onClose, team, token, onSucc
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ settings })
+        body: JSON.stringify({
+          concurrentLeave: settings.concurrentLeave,
+          annualLeaveDays: settings.annualLeaveDays,
+          defaults: settings.defaults
+        })
       })
 
       const data = await res.json()
@@ -183,11 +191,9 @@ export default function TeamSettingsModal({ isOpen, onClose, team, token, onSucc
           zIndex: 9
         }}>
           {[
-            { id: 'shift', label: '🔄 Shift Pattern', icon: '🔄' },
-            { id: 'time', label: '⏰ Shift Time', icon: '⏰' },
-            { id: 'days', label: '📅 Working Days', icon: '📅' },
-            { id: 'limits', label: '👥 Concurrent Limits', icon: '👥' },
-            { id: 'annual', label: '📊 Annual Leave', icon: '📊' }
+            { id: 'limits', label: '� Concurrent Limits', icon: '👥' },
+            { id: 'annual', label: '� Annual Leave', icon: '�' },
+            { id: 'defaults', label: '⚙️ Default Settings', icon: '⚙️' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -212,233 +218,6 @@ export default function TeamSettingsModal({ isOpen, onClose, team, token, onSucc
 
         {/* Content */}
         <div style={{ padding: '20px' }}>
-          {/* Shift Pattern Tab */}
-          {activeTab === 'shift' && (
-            <div>
-              <h3 style={{ marginTop: 0, fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>
-                Select Shift Pattern
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  { value: 'regular', label: 'Regular (Mon-Fri)', description: 'Standard Monday to Friday workweek' },
-                  { value: '2-2', label: '2/2 Shift', description: '2 days on, 2 days off rotating pattern' },
-                  { value: '5-2', label: '5/2 Shift', description: '5 days on, 2 days off rotating pattern' },
-                  { value: 'custom', label: 'Custom Pattern', description: 'Define your own shift cycle' }
-                ].map(option => (
-                  <label
-                    key={option.value}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      padding: '15px',
-                      border: settings.shiftPattern.type === option.value ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      background: settings.shiftPattern.type === option.value ? '#eff6ff' : 'white',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="shiftPattern"
-                      value={option.value}
-                      checked={settings.shiftPattern.type === option.value}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        shiftPattern: { ...settings.shiftPattern, type: e.target.value }
-                      })}
-                      style={{ marginRight: '12px', marginTop: '3px' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '500', fontSize: '15px' }}>{option.label}</div>
-                      <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '3px' }}>{option.description}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-
-              {settings.shiftPattern.type === 'custom' && (
-                <div style={{ marginTop: '15px' }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-                    Custom Pattern (e.g., "3-2" for 3 on, 2 off)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., 3-2"
-                    value={settings.shiftPattern.customPattern || ''}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      shiftPattern: { ...settings.shiftPattern, customPattern: e.target.value }
-                    })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '5px',
-                      fontSize: '14px'
-                    }}
-                  />
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginTop: '15px', marginBottom: '8px' }}>
-                    Reference Date (first day of cycle)
-                  </label>
-                  <input
-                    type="date"
-                    value={settings.shiftPattern.referenceDate || ''}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      shiftPattern: { ...settings.shiftPattern, referenceDate: e.target.value }
-                    })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '5px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Shift Time Tab */}
-          {activeTab === 'time' && (
-            <div>
-              <h3 style={{ marginTop: 0, fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>
-                Select Shift Time
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  { value: 'day', label: '☀️ Day Shift', description: 'Typical daytime hours (08:00 - 17:00)' },
-                  { value: 'night', label: '🌙 Night Shift', description: 'Overnight hours (20:00 - 05:00)' },
-                  { value: 'custom', label: '🕐 Custom Hours', description: 'Define specific shift hours' }
-                ].map(option => (
-                  <label
-                    key={option.value}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      padding: '15px',
-                      border: settings.shiftTime.type === option.value ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      background: settings.shiftTime.type === option.value ? '#eff6ff' : 'white',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="shiftTime"
-                      value={option.value}
-                      checked={settings.shiftTime.type === option.value}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        shiftTime: { ...settings.shiftTime, type: e.target.value }
-                      })}
-                      style={{ marginRight: '12px', marginTop: '3px' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '500', fontSize: '15px' }}>{option.label}</div>
-                      <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '3px' }}>{option.description}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-
-              {settings.shiftTime.type === 'custom' && (
-                <div style={{ marginTop: '15px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-                      Start Time
-                    </label>
-                    <input
-                      type="time"
-                      value={settings.shiftTime.customStart || '08:00'}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        shiftTime: { ...settings.shiftTime, customStart: e.target.value }
-                      })}
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '5px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-                      End Time
-                    </label>
-                    <input
-                      type="time"
-                      value={settings.shiftTime.customEnd || '17:00'}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        shiftTime: { ...settings.shiftTime, customEnd: e.target.value }
-                      })}
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '5px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Working Days Tab */}
-          {activeTab === 'days' && (
-            <div>
-              <h3 style={{ marginTop: 0, fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>
-                Configure Working Days
-              </h3>
-              <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px' }}>
-                Select which days are working days for this team. This affects working days calculation.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  { key: 'monday', label: 'Monday' },
-                  { key: 'tuesday', label: 'Tuesday' },
-                  { key: 'wednesday', label: 'Wednesday' },
-                  { key: 'thursday', label: 'Thursday' },
-                  { key: 'friday', label: 'Friday' },
-                  { key: 'saturday', label: 'Saturday' },
-                  { key: 'sunday', label: 'Sunday' }
-                ].map(day => (
-                  <label
-                    key={day.key}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '12px 15px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      background: settings.workingDays[day.key as keyof typeof settings.workingDays] ? '#f0fdf4' : 'white',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={settings.workingDays[day.key as keyof typeof settings.workingDays]}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        workingDays: { ...settings.workingDays, [day.key]: e.target.checked }
-                      })}
-                      style={{ marginRight: '12px', width: '18px', height: '18px' }}
-                    />
-                    <span style={{ fontWeight: '500', fontSize: '15px' }}>{day.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Concurrent Limits Tab */}
           {activeTab === 'limits' && (
@@ -604,6 +383,156 @@ export default function TeamSettingsModal({ isOpen, onClose, team, token, onSucc
                   • US Average: 10-15 days<br />
                   • EU Minimum: 20 days<br />
                   • Custom: Set any value between 1-365 days
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Default Settings Tab */}
+          {activeTab === 'defaults' && (
+            <div>
+              <h3 style={{ marginTop: 0, fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>
+                Default Settings for New Members
+              </h3>
+              <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px' }}>
+                These settings will be automatically applied to new team members. Individual members can customize their own shift settings from their profile.
+              </p>
+
+              {/* Default Shift Pattern */}
+              <div style={{ marginBottom: '30px' }}>
+                <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>Default Shift Pattern</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {[
+                    { value: 'regular', label: 'Regular (Mon-Fri)', description: 'Standard Monday to Friday workweek' },
+                    { value: '2-2', label: '2/2 Shift', description: '2 days on, 2 days off rotating pattern' },
+                    { value: '5-2', label: '5/2 Shift', description: '5 days on, 2 days off rotating pattern' }
+                  ].map(option => (
+                    <label
+                      key={option.value}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        padding: '12px',
+                        border: settings.defaults?.shiftPattern?.type === option.value ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: settings.defaults?.shiftPattern?.type === option.value ? '#eff6ff' : 'white',
+                        transition: 'all 0.2s',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="defaultShiftPattern"
+                        value={option.value}
+                        checked={settings.defaults?.shiftPattern?.type === option.value}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          defaults: {
+                            ...settings.defaults!,
+                            shiftPattern: { ...settings.defaults!.shiftPattern, type: e.target.value }
+                          }
+                        })}
+                        style={{ marginRight: '10px', marginTop: '2px' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '500' }}>{option.label}</div>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{option.description}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Default Shift Time */}
+              <div style={{ marginBottom: '30px' }}>
+                <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>Default Shift Time</h4>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {[
+                    { value: 'day', label: '☀️ Day Shift' },
+                    { value: 'night', label: '🌙 Night Shift' }
+                  ].map(option => (
+                    <label
+                      key={option.value}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '12px',
+                        border: settings.defaults?.shiftTime?.type === option.value ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: settings.defaults?.shiftTime?.type === option.value ? '#eff6ff' : 'white',
+                        transition: 'all 0.2s',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="defaultShiftTime"
+                        value={option.value}
+                        checked={settings.defaults?.shiftTime?.type === option.value}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          defaults: {
+                            ...settings.defaults!,
+                            shiftTime: { ...settings.defaults!.shiftTime, type: e.target.value }
+                          }
+                        })}
+                        style={{ marginRight: '8px' }}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Default Working Days */}
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>Default Working Days</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+                  {[
+                    { key: 'monday', label: 'Mon' },
+                    { key: 'tuesday', label: 'Tue' },
+                    { key: 'wednesday', label: 'Wed' },
+                    { key: 'thursday', label: 'Thu' },
+                    { key: 'friday', label: 'Fri' },
+                    { key: 'saturday', label: 'Sat' },
+                    { key: 'sunday', label: 'Sun' }
+                  ].map(day => (
+                    <label
+                      key={day.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        background: settings.defaults?.workingDays?.[day.key as keyof typeof settings.defaults.workingDays] ? '#f0fdf4' : 'white',
+                        transition: 'all 0.2s',
+                        fontSize: '13px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={settings.defaults?.workingDays?.[day.key as keyof typeof settings.defaults.workingDays] || false}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          defaults: {
+                            ...settings.defaults!,
+                            workingDays: { ...settings.defaults!.workingDays, [day.key]: e.target.checked }
+                          }
+                        })}
+                        style={{ marginRight: '6px', width: '16px', height: '16px' }}
+                      />
+                      {day.label}
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>

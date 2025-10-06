@@ -683,13 +683,33 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
       return res.status(403).json({ error: 'Can only update settings for your own team' });
     }
 
-    const { shiftPattern, shiftTime, workingDays, concurrentLeave, annualLeaveDays } = req.body;
+    const { concurrentLeave, annualLeaveDays, defaults } = req.body;
 
-    // Validate shift pattern if provided
-    if (shiftPattern) {
-      const validation = validateShiftPattern(shiftPattern);
-      if (!validation.valid) {
-        return res.status(400).json({ error: validation.error });
+    // Validate defaults if provided (these are default shift settings for new team members)
+    if (defaults) {
+      if (defaults.shiftPattern) {
+        const validation = validateShiftPattern(defaults.shiftPattern);
+        if (!validation.valid) {
+          return res.status(400).json({ error: `Default shift pattern: ${validation.error}` });
+        }
+      }
+      
+      if (defaults.workingDays) {
+        const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        let hasAtLeastOneDay = false;
+        
+        for (const day of validDays) {
+          if (defaults.workingDays.hasOwnProperty(day)) {
+            if (typeof defaults.workingDays[day] !== 'boolean') {
+              return res.status(400).json({ error: `Default working day '${day}' must be a boolean` });
+            }
+            if (defaults.workingDays[day]) hasAtLeastOneDay = true;
+          }
+        }
+        
+        if (!hasAtLeastOneDay) {
+          return res.status(400).json({ error: 'Default working days must have at least one day selected' });
+        }
       }
     }
 
@@ -709,15 +729,34 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
     }
 
     // Get current settings or defaults
-    const currentSettings = team.settings || getDefaultTeamSettings();
+    const currentSettings = team.settings || {
+      concurrentLeave: {
+        enabled: false,
+        maxPerShift: 3,
+        maxPerTeam: 5,
+        checkByShift: false
+      },
+      annualLeaveDays: 21,
+      defaults: {
+        shiftPattern: { type: 'regular' },
+        shiftTime: { type: 'day' },
+        workingDays: {
+          monday: true,
+          tuesday: true,
+          wednesday: true,
+          thursday: true,
+          friday: true,
+          saturday: false,
+          sunday: false
+        }
+      }
+    };
 
-    // Merge with new settings
+    // Merge with new settings (only policy-level settings now)
     const updatedSettings = {
-      shiftPattern: shiftPattern || currentSettings.shiftPattern,
-      shiftTime: shiftTime || currentSettings.shiftTime,
-      workingDays: workingDays || currentSettings.workingDays,
       concurrentLeave: concurrentLeave || currentSettings.concurrentLeave,
       annualLeaveDays: annualLeaveDays !== undefined ? annualLeaveDays : currentSettings.annualLeaveDays,
+      defaults: defaults || currentSettings.defaults,
       updatedAt: new Date(),
       updatedBy: new ObjectId(decoded.id)
     };
