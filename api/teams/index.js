@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { MongoClient } from 'mongodb';
+import { rateLimiters } from '../shared/rate-limiter.js';
+import { logger } from '../shared/logger.js';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -14,6 +16,8 @@ async function connectDB() {
 }
 
 export default async function handler(req, res) {
+  const startTime = Date.now();
+  
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -25,6 +29,17 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
+  }
+
+  // Rate limiting
+  const rateLimit = rateLimiters.read(req);
+  Object.entries(rateLimit.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
+  if (!rateLimit.allowed) {
+    logger.warn('Rate limit exceeded', { endpoint: '/api/teams/index', ip: req.headers['x-forwarded-for'] });
+    return res.status(429).json({ success: false, error: rateLimit.message });
   }
 
   const authHeader = req.headers.authorization;
@@ -53,10 +68,13 @@ export default async function handler(req, res) {
       };
     }));
 
+    const duration = Date.now() - startTime;
+    logger.response(req, res, duration, { teamCount: teamsWithCount.length });
+
     return res.status(200).json({ success: true, teams: teamsWithCount });
 
   } catch (error) {
-    console.error('Error in teams/index:', error);
+    logger.error('Error in teams/index', { error: error.message, stack: error.stack });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

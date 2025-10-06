@@ -1,5 +1,6 @@
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { logger } from './logger.js';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = 'leavebot';
@@ -33,7 +34,7 @@ async function connectToDatabase() {
   cachedClient = client;
   cachedDb = db;
 
-  console.log('✅ Connected to MongoDB');
+  logger.info('Connected to MongoDB successfully');
   return { client, db };
 }
 
@@ -64,11 +65,11 @@ export async function initializeAdmin() {
         role: 'admin',
         createdAt: new Date()
       });
-      console.log('✅ Initial admin user created from environment variables');
+      logger.info('Initial admin user created from environment variables');
       return true;
     }
   } catch (error) {
-    console.error('Error initializing admin:', error);
+    logger.error('Error initializing admin', { error: error.message });
   }
   return false;
 }
@@ -79,7 +80,7 @@ export async function getUserByUsername(username) {
     const { db } = await connectToDatabase();
     return await db.collection('users').findOne({ username });
   } catch (error) {
-    console.error('Error getting user:', error);
+    logger.error('Error getting user:', error);
     return null;
   }
 }
@@ -90,7 +91,7 @@ export async function getUserById(id) {
     const { db } = await connectToDatabase();
     return await db.collection('users').findOne({ _id: id });
   } catch (error) {
-    console.error('Error getting user by id:', error);
+    logger.error('Error getting user by id:', error);
     return null;
   }
 }
@@ -114,7 +115,7 @@ export async function addUser(userData) {
     const result = await usersCollection.insertOne(newUser);
     return { _id: result.insertedId, ...newUser };
   } catch (error) {
-    console.error('Error adding user:', error);
+    logger.error('Error adding user:', error);
     throw error;
   }
 }
@@ -125,7 +126,7 @@ export async function getAllUsers() {
     const { db } = await connectToDatabase();
     return await db.collection('users').find({}).toArray();
   } catch (error) {
-    console.error('Error getting all users:', error);
+    logger.error('Error getting all users:', error);
     return [];
   }
 }
@@ -148,7 +149,7 @@ export async function updateUser(userId, updates) {
     
     return result.modifiedCount > 0;
   } catch (error) {
-    console.error('Error updating user:', error);
+    logger.error('Error updating user:', error);
     return false;
   }
 }
@@ -168,7 +169,7 @@ export async function deleteUser(userId) {
     
     return result.deletedCount > 0;
   } catch (error) {
-    console.error('Error deleting user:', error);
+    logger.error('Error deleting user:', error);
     return false;
   }
 }
@@ -188,7 +189,7 @@ export async function updateUserPassword(userId, newPassword) {
     
     return result.modifiedCount > 0;
   } catch (error) {
-    console.error('Error updating password:', error);
+    logger.error('Error updating password:', error);
     return false;
   }
 }
@@ -206,7 +207,7 @@ export async function getAllLeaves(userId = null, role = 'user') {
     
     return await leavesCollection.find(query).sort({ createdAt: -1 }).toArray();
   } catch (error) {
-    console.error('Error getting leaves:', error);
+    logger.error('Error getting leaves:', error);
     return [];
   }
 }
@@ -226,7 +227,7 @@ export async function addLeaveRequest(leaveData) {
     const result = await leavesCollection.insertOne(newLeave);
     return { _id: result.insertedId, ...newLeave };
   } catch (error) {
-    console.error('Error adding leave request:', error);
+    logger.error('Error adding leave request:', error);
     throw error;
   }
 }
@@ -244,7 +245,7 @@ export async function updateLeaveStatus(leaveId, status) {
     
     return result.modifiedCount > 0;
   } catch (error) {
-    console.error('Error updating leave status:', error);
+    logger.error('Error updating leave status:', error);
     return false;
   }
 }
@@ -257,7 +258,7 @@ export async function getAllTeams() {
     const { db } = await connectToDatabase();
     return await db.collection('teams').find({}).toArray();
   } catch (error) {
-    console.error('Error getting teams:', error);
+    logger.error('Error getting teams:', error);
     return [];
   }
 }
@@ -268,7 +269,7 @@ export async function getTeamById(teamId) {
     const { db } = await connectToDatabase();
     return await db.collection('teams').findOne({ _id: teamId });
   } catch (error) {
-    console.error('Error getting team:', error);
+    logger.error('Error getting team:', error);
     return null;
   }
 }
@@ -288,7 +289,7 @@ export async function createTeam(teamData) {
     const result = await teamsCollection.insertOne(newTeam);
     return { _id: result.insertedId, ...newTeam };
   } catch (error) {
-    console.error('Error creating team:', error);
+    logger.error('Error creating team:', error);
     throw error;
   }
 }
@@ -306,7 +307,7 @@ export async function updateTeam(teamId, updates) {
     
     return result.modifiedCount > 0;
   } catch (error) {
-    console.error('Error updating team:', error);
+    logger.error('Error updating team:', error);
     return false;
   }
 }
@@ -327,7 +328,7 @@ export async function deleteTeam(teamId) {
     const result = await teamsCollection.deleteOne({ _id: teamId });
     return result.deletedCount > 0;
   } catch (error) {
-    console.error('Error deleting team:', error);
+    logger.error('Error deleting team:', error);
     return false;
   }
 }
@@ -345,7 +346,7 @@ export async function assignUserToTeam(userId, teamId) {
     
     return result.modifiedCount > 0;
   } catch (error) {
-    console.error('Error assigning user to team:', error);
+    logger.error('Error assigning user to team:', error);
     return false;
   }
 }
@@ -363,7 +364,7 @@ export async function removeUserFromTeam(userId) {
     
     return result.modifiedCount > 0;
   } catch (error) {
-    console.error('Error removing user from team:', error);
+    logger.error('Error removing user from team:', error);
     return false;
   }
 }
@@ -374,9 +375,9 @@ export async function getUsersByTeam(teamId) {
     const { db } = await connectToDatabase();
     return await db.collection('users').find({ teamId }).toArray();
   } catch (error) {
-    console.error('Error getting users by team:', error);
+    logger.error('Error getting users by team:', error);
     return [];
   }
 }
 
-console.log('✅ Using MongoDB for persistent storage');
+logger.info('Using MongoDB for persistent storage');

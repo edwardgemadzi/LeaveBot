@@ -1,48 +1,21 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin } from './shared/mongodb-storage.js';
+import { rateLimiters } from './shared/rate-limiter.js';
+import { logger } from './shared/logger.js';
+import { validateUsername, validatePassword, validateName } from './shared/validators.js';
 
 // Initialize admin on cold start
 initializeAdmin();
 
-// Input validation
-function validateUserInput(data) {
-  const { username, password, name } = data;
-  
-  if (!username || !password) {
-    return { valid: false, error: 'Username and password are required' };
-  }
-  
-  if (typeof username !== 'string' || typeof password !== 'string') {
-    return { valid: false, error: 'Invalid input format' };
-  }
-  
-  if (username.length < 3 || username.length > 50) {
-    return { valid: false, error: 'Username must be 3-50 characters' };
-  }
-  
-  if (password.length < 8) {
-    return { valid: false, error: 'Password must be at least 8 characters' };
-  }
-  
-  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-    return { valid: false, error: 'Username can only contain letters, numbers, and underscores' };
-  }
-  
-  const sanitizedData = {
-    username: username.trim(),
-    password: password,
-    name: name ? String(name).trim().substring(0, 100) : username
-  };
-  
-  return { valid: true, data: sanitizedData };
-}
-
 export default async function handler(req, res) {
+  const startTime = Date.now();
+  
   // Security headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -50,28 +23,46 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Rate limiting
+  const rateLimit = rateLimiters.mutation(req);
+  Object.entries(rateLimit.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
+  if (!rateLimit.allowed) {
+    logger.warn('Rate limit exceeded for registration', { ip: req.headers['x-forwarded-for'] });
+    return res.status(429).json({ error: rateLimit.message });
+  }
+
   const { username, password, name, teamId } = req.body;
   
-  // Validate input
-  const validation = validateUserInput({ username, password, name });
-  if (!validation.valid) {
-    return res.status(400).json({ error: validation.error });
+  // Validate inputs using validators
+  const usernameValidation = validateUsername(username);
+  if (!usernameValidation.valid) {
+    return res.status(400).json({ error: usernameValidation.error });
   }
-  
-  const { username: validUsername, password: validPassword, name: validName } = validation.data;
+
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ error: passwordValidation.error });
+  }
+
+  const nameValidation = validateName(name, false);
+  const validName = nameValidation.valid ? nameValidation.value : usernameValidation.value;
   
   // Check if user already exists
-  const existingUser = await getUserByUsername(validUsername);
+  const existingUser = await getUserByUsername(usernameValidation.value);
   if (existingUser) {
+    logger.warn('Registration attempt with existing username', { username: usernameValidation.value });
     return res.status(409).json({ error: 'Username already exists' });
   }
   
   // Hash password
-  const passwordHash = await bcrypt.hash(validPassword, 10);
+  const passwordHash = await bcrypt.hash(passwordValidation.value, 10);
   
   // Create user using helper (will auto-assign admin if first user)
   const userData = {
-    username: validUsername,
+    username: usernameValidation.value,
     passwordHash,
     name: validName
   };
@@ -94,6 +85,15 @@ export default async function handler(req, res) {
     JWT_SECRET,
     { expiresIn: '24h' }
   );
+
+  logger.info('User registered successfully', { 
+    username: newUser.username, 
+    role: newUser.role, 
+    ip: req.headers['x-forwarded-for'] 
+  });
+
+  const duration = Date.now() - startTime;
+  logger.response(req, res, duration);
 
   return res.json({
     success: true,

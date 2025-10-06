@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET, getUserByUsername, initializeAdmin } from './shared/mongodb-storage.js';
+import { logger } from './shared/logger.js';
+import { validateUsername, validatePassword } from './shared/validators.js';
 
 // Initialize admin on cold start
 initializeAdmin();
@@ -46,6 +48,8 @@ function clearAttempts(username) {
 }
 
 export default async function handler(req, res) {
+  const startTime = Date.now();
+  
   // Security headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -59,45 +63,48 @@ export default async function handler(req, res) {
 
   const { username, password } = req.body;
   
-  // Input validation
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
+  // Input validation using validators
+  const usernameValidation = validateUsername(username);
+  if (!usernameValidation.valid) {
+    logger.warn('Login attempt with invalid username', { error: usernameValidation.error });
+    return res.status(400).json({ error: usernameValidation.error });
   }
-  
-  if (typeof username !== 'string' || typeof password !== 'string') {
-    return res.status(400).json({ error: 'Invalid input format' });
-  }
-  
-  if (username.length > 100 || password.length > 100) {
-    return res.status(400).json({ error: 'Input too long' });
+
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    logger.warn('Login attempt with invalid password', { error: passwordValidation.error });
+    return res.status(400).json({ error: passwordValidation.error });
   }
   
   // Check rate limiting
-  const rateCheck = checkRateLimit(username);
+  const rateCheck = checkRateLimit(usernameValidation.value);
   if (!rateCheck.allowed) {
+    logger.warn('Rate limit exceeded for login', { username: usernameValidation.value, ip: req.headers['x-forwarded-for'] });
     return res.status(429).json({ error: rateCheck.message });
   }
   
   // Find user
-  const user = await getUserByUsername(username);
+  const user = await getUserByUsername(usernameValidation.value);
   
   if (!user) {
     // Prevent username enumeration - same delay as password check
-    await bcrypt.compare(password, '$2a$10$8K1p/a0dL3LkkPzSs/T3GOu7IqxYpU0Zy0qQZvzNqZNMkWXLrQGRW');
-    recordFailedAttempt(username);
+    await bcrypt.compare(passwordValidation.value, '$2a$10$8K1p/a0dL3LkkPzSs/T3GOu7IqxYpU0Zy0qQZvzNqZNMkWXLrQGRW');
+    recordFailedAttempt(usernameValidation.value);
+    logger.warn('Failed login attempt - user not found', { username: usernameValidation.value, ip: req.headers['x-forwarded-for'] });
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   
   // Verify password with bcrypt
-  const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+  const isValidPassword = await bcrypt.compare(passwordValidation.value, user.passwordHash);
   
   if (!isValidPassword) {
-    recordFailedAttempt(username);
+    recordFailedAttempt(usernameValidation.value);
+    logger.warn('Failed login attempt - invalid password', { username: usernameValidation.value, ip: req.headers['x-forwarded-for'] });
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   
   // Clear failed attempts on successful login
-  clearAttempts(username);
+  clearAttempts(usernameValidation.value);
   
   // Generate JWT token
   const token = jwt.sign(
@@ -109,6 +116,15 @@ export default async function handler(req, res) {
     JWT_SECRET,
     { expiresIn: '24h' }
   );
+
+  logger.info('Successful login', { 
+    username: user.username, 
+    role: user.role, 
+    ip: req.headers['x-forwarded-for'] 
+  });
+
+  const duration = Date.now() - startTime;
+  logger.response(req, res, duration);
 
   return res.json({
     success: true,

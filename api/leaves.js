@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET, getAllLeaves, addLeaveRequest } from './shared/mongodb-storage.js';
+import { rateLimiters } from './shared/rate-limiter.js';
+import { logger } from './shared/logger.js';
 
 // Authentication middleware
 function authenticateToken(req) {
@@ -50,6 +52,8 @@ function validateLeaveRequest(data) {
 }
 
 export default async function handler(req, res) {
+  const startTime = Date.now();
+  
   // Security headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -60,6 +64,17 @@ export default async function handler(req, res) {
   
   if (req.method === 'OPTIONS') return res.status(200).end();
   
+  // Rate limiting
+  const rateLimit = req.method === 'GET' ? rateLimiters.read(req) : rateLimiters.mutation(req);
+  Object.entries(rateLimit.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
+  if (!rateLimit.allowed) {
+    logger.warn('Rate limit exceeded', { endpoint: '/api/leaves', method: req.method, ip: req.headers['x-forwarded-for'] });
+    return res.status(429).json({ error: rateLimit.message });
+  }
+  
   // Authenticate all requests
   const auth = authenticateToken(req);
   if (!auth.authenticated) {
@@ -69,6 +84,10 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     // Users can only see their own leaves (unless admin)
     const leaves = await getAllLeaves(auth.user.id, auth.user.role);
+    
+    const duration = Date.now() - startTime;
+    logger.response(req, res, duration, { leaveCount: leaves.length, userId: auth.user.id });
+    
     return res.json({ leaves });
   }
 
@@ -91,6 +110,17 @@ export default async function handler(req, res) {
     };
     
     const newLeave = await addLeaveRequest(leaveData);
+    
+    logger.info('Leave request created', { 
+      leaveId: newLeave._id?.toString(), 
+      userId: auth.user.id,
+      startDate,
+      endDate 
+    });
+    
+    const duration = Date.now() - startTime;
+    logger.response(req, res, duration);
+    
     return res.json({ success: true, leave: newLeave });
   }
 
