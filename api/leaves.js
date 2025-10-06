@@ -56,7 +56,7 @@ export default async function handler(req, res) {
   
   // Security headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -122,6 +122,55 @@ export default async function handler(req, res) {
     logger.response(req, res, duration);
     
     return res.json({ success: true, leave: newLeave });
+  }
+
+  if (req.method === 'PUT') {
+    // Only admins can approve/reject leaves
+    if (auth.user.role !== 'admin') {
+      logger.warn('Non-admin attempted to update leave status', { userId: auth.user.id, role: auth.user.role });
+      return res.status(403).json({ error: 'Only admins can approve or reject leave requests' });
+    }
+
+    // Extract leave ID from URL path
+    const leaveId = req.url.split('/').pop()?.split('?')[0];
+    if (!leaveId) {
+      return res.status(400).json({ error: 'Leave ID is required' });
+    }
+
+    const { status } = req.body;
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status (approved or rejected) is required' });
+    }
+
+    try {
+      const { ObjectId } = await import('mongodb');
+      const { db } = await import('./shared/mongodb-storage.js').then(m => m.connectToDatabase());
+      const leavesCollection = db.collection('leaves');
+
+      const result = await leavesCollection.updateOne(
+        { _id: new ObjectId(leaveId) },
+        { $set: { status, updatedAt: new Date(), updatedBy: auth.user.id } }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+
+      logger.info('Leave status updated', {
+        leaveId,
+        status,
+        updatedBy: auth.user.id,
+        duration: Date.now() - startTime
+      });
+
+      const duration = Date.now() - startTime;
+      logger.response(req, res, duration);
+
+      return res.json({ success: true, message: `Leave request ${status}` });
+    } catch (err) {
+      logger.error('Error updating leave status', { error: err.message, leaveId });
+      return res.status(500).json({ error: 'Failed to update leave status' });
+    }
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

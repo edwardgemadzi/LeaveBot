@@ -3,6 +3,11 @@ const jwt = require('jsonwebtoken');
 const { rateLimiter } = require('./shared/rate-limiter');
 const { logger } = require('./shared/logger');
 const { validateObjectId, validateTeamName, sanitizeString } = require('./shared/validators');
+const { 
+  getDefaultTeamSettings, 
+  validateShiftPattern, 
+  validateConcurrentLeave 
+} = require('./shared/working-days');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -55,7 +60,9 @@ module.exports = async (req, res) => {
   try {
     // Route to appropriate handler
     if (req.method === 'GET') {
-      if (teamId) {
+      if (action === 'settings' && teamId) {
+        return await handleGetTeamSettings(req, res, decoded, startTime, teamId);
+      } else if (teamId) {
         return await handleGetTeamDetails(req, res, decoded, startTime, teamId);
       } else {
         return await handleListTeams(req, res, decoded, startTime);
@@ -66,6 +73,8 @@ module.exports = async (req, res) => {
       return await handleAssignUser(req, res, decoded, startTime, teamId);
     } else if (req.method === 'POST' && action === 'remove') {
       return await handleRemoveUser(req, res, decoded, startTime, teamId);
+    } else if (req.method === 'PUT' && action === 'settings') {
+      return await handleUpdateTeamSettings(req, res, decoded, startTime, teamId);
     } else if (req.method === 'PUT') {
       return await handleUpdateTeam(req, res, decoded, startTime, teamId);
     } else if (req.method === 'DELETE') {
@@ -257,6 +266,7 @@ async function handleCreateTeam(req, res, decoded, startTime) {
       name: nameValidation.value,
       description: sanitizedDescription,
       leaderId: leaderId ? new ObjectId(leaderId) : null,
+      settings: getDefaultTeamSettings(),
       createdAt: new Date(),
       createdBy: new ObjectId(decoded.id)
     };
@@ -584,5 +594,154 @@ async function handleRemoveUser(req, res, decoded, startTime, teamId) {
     const duration = Date.now() - startTime;
     logger.error('Error removing user', { error: err.message, teamId, userId: req.body.userId, duration });
     return res.status(500).json({ error: 'Failed to remove user' });
+  }
+}
+
+// GET /api/teams?id={teamId}&action=settings - Get team settings
+async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
+  const rateLimitResult = rateLimiter.read(req);
+  if (rateLimitResult.blocked) {
+    logger.warn('Rate limit exceeded for get team settings', { userId: decoded.id, teamId });
+    return res.status(429).json({ error: rateLimitResult.error });
+  }
+
+  const teamIdValidation = validateObjectId(teamId);
+  if (!teamIdValidation.valid) {
+    return res.status(400).json({ error: teamIdValidation.error });
+  }
+
+  try {
+    const client = await connectToDatabase();
+    const db = client.db('leavebot');
+    const teamsCollection = db.collection('teams');
+
+    const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    // Leaders can only view their own team settings
+    if (decoded.role === 'leader' && team.leaderId?.toString() !== decoded.id) {
+      logger.warn('Leader attempted to view another team settings', { userId: decoded.id, teamId });
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Return settings or defaults
+    const settings = team.settings || getDefaultTeamSettings();
+
+    const duration = Date.now() - startTime;
+    logger.response(req, res, duration, { teamId });
+
+    return res.status(200).json({
+      settings,
+      team: {
+        _id: team._id,
+        name: team.name,
+        description: team.description,
+        leaderId: team.leaderId
+      }
+    });
+  } catch (err) {
+    const duration = Date.now() - startTime;
+    logger.error('Error getting team settings', { error: err.message, teamId, userId: decoded.id, duration });
+    return res.status(500).json({ error: 'Failed to get team settings' });
+  }
+}
+
+// PUT /api/teams?id={teamId}&action=settings - Update team settings
+async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
+  const rateLimitResult = rateLimiter.mutation(req);
+  if (rateLimitResult.blocked) {
+    logger.warn('Rate limit exceeded for update team settings', { userId: decoded.id, teamId });
+    return res.status(429).json({ error: rateLimitResult.error });
+  }
+
+  const teamIdValidation = validateObjectId(teamId);
+  if (!teamIdValidation.valid) {
+    return res.status(400).json({ error: teamIdValidation.error });
+  }
+
+  // Only admins and team leaders can update settings
+  if (decoded.role !== 'admin' && decoded.role !== 'leader') {
+    logger.warn('Non-admin/leader attempted to update team settings', { userId: decoded.id, role: decoded.role });
+    return res.status(403).json({ error: 'Only admins and team leaders can update team settings' });
+  }
+
+  try {
+    const client = await connectToDatabase();
+    const db = client.db('leavebot');
+    const teamsCollection = db.collection('teams');
+
+    const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    // Leaders can only update their own team settings
+    if (decoded.role === 'leader' && team.leaderId?.toString() !== decoded.id) {
+      logger.warn('Leader attempted to update another team settings', { userId: decoded.id, teamId });
+      return res.status(403).json({ error: 'Can only update settings for your own team' });
+    }
+
+    const { shiftPattern, shiftTime, workingDays, concurrentLeave, annualLeaveDays } = req.body;
+
+    // Validate shift pattern if provided
+    if (shiftPattern) {
+      const validation = validateShiftPattern(shiftPattern);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
+      }
+    }
+
+    // Validate concurrent leave settings if provided
+    if (concurrentLeave) {
+      const validation = validateConcurrentLeave(concurrentLeave);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
+      }
+    }
+
+    // Validate annual leave days
+    if (annualLeaveDays !== undefined) {
+      if (typeof annualLeaveDays !== 'number' || annualLeaveDays < 1 || annualLeaveDays > 365) {
+        return res.status(400).json({ error: 'Annual leave days must be between 1 and 365' });
+      }
+    }
+
+    // Get current settings or defaults
+    const currentSettings = team.settings || getDefaultTeamSettings();
+
+    // Merge with new settings
+    const updatedSettings = {
+      shiftPattern: shiftPattern || currentSettings.shiftPattern,
+      shiftTime: shiftTime || currentSettings.shiftTime,
+      workingDays: workingDays || currentSettings.workingDays,
+      concurrentLeave: concurrentLeave || currentSettings.concurrentLeave,
+      annualLeaveDays: annualLeaveDays !== undefined ? annualLeaveDays : currentSettings.annualLeaveDays,
+      updatedAt: new Date(),
+      updatedBy: new ObjectId(decoded.id)
+    };
+
+    await teamsCollection.updateOne(
+      { _id: new ObjectId(teamId) },
+      { $set: { settings: updatedSettings } }
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info('Team settings updated', {
+      teamId,
+      updatedBy: decoded.id,
+      fields: Object.keys(req.body),
+      duration
+    });
+
+    return res.status(200).json({
+      message: 'Team settings updated successfully',
+      settings: updatedSettings
+    });
+  } catch (err) {
+    const duration = Date.now() - startTime;
+    logger.error('Error updating team settings', { error: err.message, teamId, userId: decoded.id, duration });
+    return res.status(500).json({ error: 'Failed to update team settings' });
   }
 }
