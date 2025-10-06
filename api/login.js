@@ -109,7 +109,7 @@ export default async function handler(req, res) {
   // Generate JWT token
   const token = jwt.sign(
     { 
-      id: user.id, 
+      id: user._id.toString(), 
       username: user.username, 
       role: user.role 
     },
@@ -128,7 +128,7 @@ export default async function handler(req, res) {
 
   return res.json({
     success: true,
-    user: { id: user.id, username: user.username, name: user.name, role: user.role },
+    user: { id: user._id.toString(), username: user.username, name: user.name, role: user.role },
     token
   });
 }
