@@ -58,8 +58,17 @@ function App() {
     const savedToken = localStorage.getItem('token')
     const savedUser = localStorage.getItem('user')
     if (savedToken && savedUser) {
+      const parsedUser = JSON.parse(savedUser)
+      // Migration: Force re-login if user.id is undefined (old token format)
+      if (!parsedUser.id || parsedUser.id === 'undefined') {
+        console.log('Invalid user ID detected, clearing session...')
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        showError('Please log in again to continue')
+        return
+      }
       setToken(savedToken)
-      setUser(JSON.parse(savedUser))
+      setUser(parsedUser)
       loadLeaves(savedToken)
     }
   }, [])
