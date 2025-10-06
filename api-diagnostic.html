@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeaveBot API Diagnostic</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .endpoint {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 LeaveBot API Diagnostic Tool</h1>
+        <p>This tool helps diagnose API connectivity issues with your LeaveBot deployment.</p>
+
+        <div class="info status">
+            <strong>⚠️ Instructions:</strong> You need to be logged in to test these APIs. 
+            Open your LeaveBot app in another tab, log in as admin, then come back here.
+        </div>
+
+        <div class="test-section">
+            <h3>Step 1: Get Auth Token</h3>
+            <p>Paste your auth token here (from localStorage):</p>
+            <input type="text" id="token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width: 100%; padding: 8px; margin: 10px 0;">
+            <p><small>To find your token: Open DevTools → Console → Type: <code>localStorage.getItem('token')</code></small></p>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 2: Test API Endpoints</h3>
+            <button onclick="testEndpoint('/api/users', 'GET')">Test GET /api/users</button>
+            <button onclick="testEndpoint('/api/teams', 'GET')">Test GET /api/teams</button>
+            <button onclick="testEndpoint('/api/leaves', 'GET')">Test GET /api/leaves</button>
+            <button onclick="testAllEndpoints()">Test All Endpoints</button>
+            <button onclick="clearResults()">Clear Results</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function getToken() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                alert('Please enter your auth token first!');
+                return null;
+            }
+            return token;
+        }
+
+        async function testEndpoint(path, method = 'GET') {
+            const token = getToken();
+            if (!token) return;
+
+            const resultsDiv = document.getElementById('results');
+            const testId = Date.now();
+            
+            // Add loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = `test-${testId}`;
+            loadingDiv.className = 'info status';
+            loadingDiv.innerHTML = `
+                <strong>Testing:</strong> ${method} ${path}<br>
+                <em>Loading...</em>
+            `;
+            resultsDiv.appendChild(loadingDiv);
+
+            try {
+                const startTime = performance.now();
+                const response = await fetch(path, {
+                    method: method,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+
+                const resultDiv = document.getElementById(`test-${testId}`);
+                resultDiv.className = response.ok ? 'success status' : 'error status';
+                resultDiv.innerHTML = `
+                    <strong>Endpoint:</strong> <span class="endpoint">${method} ${path}</span><br>
+                    <strong>Status:</strong> ${response.status} ${response.statusText}<br>
+                    <strong>Response Time:</strong> ${responseTime}ms<br>
+                    <strong>Success:</strong> ${response.ok ? '✅' : '❌'}<br>
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer; font-weight: bold;">View Response</summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                // Scroll to result
+                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch (error) {
+                const resultDiv = document.getElementById(`test-${testId}`);
+                resultDiv.className = 'error status';
+                resultDiv.innerHTML = `
+                    <strong>Endpoint:</strong> <span class="endpoint">${method} ${path}</span><br>
+                    <strong>Error:</strong> ${error.message}<br>
+                    <strong>Type:</strong> Network Error (likely CORS or server down)<br>
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer; font-weight: bold;">Error Details</summary>
+                        <pre>${error.stack || error.toString()}</pre>
+                    </details>
+                `;
+            }
+        }
+
+        async function testAllEndpoints() {
+            clearResults();
+            const endpoints = [
+                '/api/users',
+                '/api/teams',
+                '/api/leaves'
+            ];
+            
+            for (const endpoint of endpoints) {
+                await testEndpoint(endpoint, 'GET');
+                await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Auto-fill token from localStorage if running on same domain
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                document.getElementById('token').value = token;
+                document.getElementById('token').style.background = '#d4edda';
+            }
+        });
+    </script>
+</body>
+</html>
