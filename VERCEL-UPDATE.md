@@ -11,7 +11,7 @@ https://vercel.com/dashboard → Select "LeaveBot" → Settings → Environment 
 
 **Value (copy this exactly):**
 ```
-mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
+mongodb+srv://leavebot:<YOUR_NEW_PASSWORD>@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
 ```
 
 **Environments:** ✅ Production ✅ Preview ✅ Development
@@ -24,7 +24,7 @@ mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot?re
 
 **Value (copy this exactly):**
 ```
-zymhin-sopraf-2qohDa
+<YOUR_NEW_JWT_SECRET>
 ```
 
 **Environments:** ✅ Production ✅ Preview ✅ Development

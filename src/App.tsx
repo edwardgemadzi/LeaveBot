@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import Dashboard from './components/Dashboard'
 import LeaveCalendar from './components/LeaveCalendar'
+import UserManagement from './components/UserManagement'
 
-type View = 'dashboard' | 'calendar' | 'list' | 'form'
+type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team'
 
 function App() {
   const [user, setUser] = useState<any>(null)
@@ -281,6 +282,14 @@ function App() {
           icon="✏️"
           label="Request Leave"
         />
+        {(user.role === 'admin' || user.role === 'leader') && (
+          <NavTab 
+            active={currentView === 'team'} 
+            onClick={() => setCurrentView('team')}
+            icon="👥"
+            label="Team Management"
+          />
+        )}
       </div>
 
       {/* View Content */}
@@ -290,6 +299,10 @@ function App() {
 
       {currentView === 'calendar' && (
         <LeaveCalendar user={user} leaves={leaves} />
+      )}
+
+      {currentView === 'team' && (user.role === 'admin' || user.role === 'leader') && (
+        <UserManagement currentUser={user} token={token} />
       )}
 
       {currentView === 'form' && (

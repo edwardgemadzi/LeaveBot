@@ -130,14 +130,77 @@ export async function getAllUsers() {
 
 // Leave management functions
 
+// Update user profile
+export async function updateUser(userId, updates) {
+  try {
+    const { db } = await connectToDatabase();
+    const usersCollection = db.collection('users');
+    
+    // Remove sensitive fields that shouldn't be updated directly
+    const { passwordHash, ...safeUpdates } = updates;
+    
+    const result = await usersCollection.updateOne(
+      { _id: userId },
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
+    );
+    
+    return result.modifiedCount > 0;
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return false;
+  }
+}
+
+// Delete user
+export async function deleteUser(userId) {
+  try {
+    const { db } = await connectToDatabase();
+    const usersCollection = db.collection('users');
+    
+    const result = await usersCollection.deleteOne({ _id: userId });
+    
+    // Also delete all leaves for this user
+    if (result.deletedCount > 0) {
+      await db.collection('leaves').deleteMany({ userId });
+    }
+    
+    return result.deletedCount > 0;
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return false;
+  }
+}
+
+// Update user password
+export async function updateUserPassword(userId, newPassword) {
+  try {
+    const { db } = await connectToDatabase();
+    const usersCollection = db.collection('users');
+    
+    const passwordHash = bcrypt.hashSync(newPassword, 10);
+    
+    const result = await usersCollection.updateOne(
+      { _id: userId },
+      { $set: { passwordHash, updatedAt: new Date() } }
+    );
+    
+    return result.modifiedCount > 0;
+  } catch (error) {
+    console.error('Error updating password:', error);
+    return false;
+  }
+}
+
+// Leave management functions
+
 // Get all leaves
 export async function getAllLeaves(userId = null, role = 'user') {
   try {
     const { db } = await connectToDatabase();
     const leavesCollection = db.collection('leaves');
     
-    // Admin can see all leaves, regular users only see their own
-    const query = role === 'admin' ? {} : { userId };
+    // Admin and leader can see all leaves, regular users only see their own
+    const query = (role === 'admin' || role === 'leader') ? {} : { userId };
     
     return await leavesCollection.find(query).sort({ createdAt: -1 }).toArray();
   } catch (error) {

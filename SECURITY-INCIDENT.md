@@ -15,12 +15,12 @@
 #### Exposed Credentials:
 1. **MongoDB Connection String**
    - Username: `leavebot`
-   - Password: `9qGsGyP1btSulfF8`
+   - Password: `<OLD_PASSWORD_REDACTED>`
    - Cluster: `leavebot.kih8gyg.mongodb.net`
-   - Full URI: `mongodb+srv://leavebot:9qGsGyP1btSulfF8@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot`
+   - Full URI: `mongodb+srv://leavebot:<OLD_PASSWORD_REDACTED>@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot`
 
 2. **JWT Secret**
-   - Exposed value: `0f9OBraUVEirfoYezCvxKkA0sqmLl1tzeB/DS+r815A=`
+   - Exposed value: `<OLD_SECRET_REDACTED>`
 
 ---
 
@@ -32,7 +32,7 @@
 - Credentials no longer visible in latest commit
 
 ### ✅ 2. Generated New JWT Secret
-- New secret: `ytd5zFBUV9AXM/f48yC4sWUqjn0n6XPRUDrqzBNEHng=`
+- New secret: `<NEW_SECRET_GENERATED>`
 - Ready to replace exposed secret
 
 ---
@@ -61,7 +61,7 @@ Go to: **Vercel Dashboard → LeaveBot → Settings → Environment Variables**
 
 MONGODB_URI=mongodb+srv://leavebot:<NEW_PASSWORD_FROM_ATLAS>@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
 
-JWT_SECRET=ytd5zFBUV9AXM/f48yC4sWUqjn0n6XPRUDrqzBNEHng=
+JWT_SECRET=<YOUR_NEW_JWT_SECRET>
 ```
 
 ### 3. Update Local .env File
@@ -70,7 +70,7 @@ Update your local `.env` file with:
 ```bash
 MONGODB_URI=mongodb+srv://leavebot:<NEW_PASSWORD_FROM_ATLAS>@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
 
-JWT_SECRET=ytd5zFBUV9AXM/f48yC4sWUqjn0n6XPRUDrqzBNEHng=
+JWT_SECRET=<YOUR_NEW_JWT_SECRET>
 ```
 
 ### 4. Redeploy Application
@@ -236,7 +236,8 @@ If you notice any suspicious activity:
 
 ## New JWT Secret (Save This Securely)
 ```
-ytd5zFBUV9AXM/f48yC4sWUqjn0n6XPRUDrqzBNEHng=
+<GENERATE_YOUR_OWN_WITH: openssl rand -base64 32>
 ```
 
 Use this to replace the exposed JWT_SECRET in Vercel.
+

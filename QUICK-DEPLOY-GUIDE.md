@@ -15,7 +15,7 @@ Go to: https://vercel.com/dashboard
 
 #### MONGODB_URI
 ```
-mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
+mongodb+srv://leavebot:<YOUR_PASSWORD>@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
 ```
 - Click "Edit" on existing MONGODB_URI
 - Paste the new value
@@ -24,7 +24,7 @@ mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot?re
 
 #### JWT_SECRET
 ```
-zymhin-sopraf-2qohDa
+<YOUR_JWT_SECRET>
 ```
 - Click "Edit" on existing JWT_SECRET
 - Paste the new value  

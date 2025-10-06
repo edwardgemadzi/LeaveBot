@@ -1,0 +1,535 @@
+import { useState, useEffect } from 'react'
+
+interface User {
+  id: string
+  _id?: string
+  username: string
+  name: string
+  role: 'admin' | 'leader' | 'user'
+  createdAt: string
+}
+
+interface UserManagementProps {
+  currentUser: User
+  token: string
+}
+
+export default function UserManagement({ currentUser, token }: UserManagementProps) {
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editRole, setEditRole] = useState<'admin' | 'leader' | 'user'>('user')
+  const [newPassword, setNewPassword] = useState('')
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [changingPasswordFor, setChangingPasswordFor] = useState<User | null>(null)
+
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  async function loadUsers() {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await res.json()
+
+      if (res.status === 401 || res.status === 403) {
+        setError(data.error || 'Access denied')
+        return
+      }
+
+      if (data.success) {
+        setUsers(data.users)
+      } else {
+        setError(data.error || 'Failed to load users')
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleUpdateUser() {
+    if (!editingUser) return
+
+    setError('')
+    try {
+      const res = await fetch(`/api/users/${editingUser.id || editingUser._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: editName,
+          role: editRole
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        alert('User updated successfully!')
+        setEditingUser(null)
+        loadUsers()
+      } else {
+        setError(data.error || 'Failed to update user')
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+    }
+  }
+
+  async function handleDeleteUser(user: User) {
+    if (!confirm(`Are you sure you want to delete ${user.name}? This will also delete all their leave requests.`)) {
+      return
+    }
+
+    setError('')
+    try {
+      const res = await fetch(`/api/users/${user.id || user._id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        alert('User deleted successfully!')
+        loadUsers()
+      } else {
+        setError(data.error || 'Failed to delete user')
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+    }
+  }
+
+  async function handleChangePassword() {
+    if (!changingPasswordFor) return
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+
+    setError('')
+    try {
+      const res = await fetch(`/api/users/${changingPasswordFor.id || changingPasswordFor._id}/password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ newPassword })
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        alert('Password updated successfully!')
+        setShowPasswordModal(false)
+        setChangingPasswordFor(null)
+        setNewPassword('')
+      } else {
+        setError(data.error || 'Failed to update password')
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+    }
+  }
+
+  function canManageUser(user: User): boolean {
+    if (currentUser.role === 'admin') {
+      // Admins can manage everyone except themselves
+      return user.id !== currentUser.id && user._id?.toString() !== currentUser.id
+    }
+    if (currentUser.role === 'leader') {
+      // Leaders can only manage regular users
+      return user.role === 'user'
+    }
+    return false
+  }
+
+  function getRoleColor(role: string) {
+    switch (role) {
+      case 'admin': return { bg: '#dbeafe', text: '#1e40af' }
+      case 'leader': return { bg: '#fef3c7', text: '#92400e' }
+      case 'user': return { bg: '#e5e7eb', text: '#374151' }
+      default: return { bg: '#e5e7eb', text: '#374151' }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <p>Loading users...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <div style={{ marginBottom: '30px' }}>
+        <h2 style={{ color: '#333', marginBottom: '10px' }}>
+          👥 Team Management
+        </h2>
+        <p style={{ color: '#6b7280', fontSize: '14px' }}>
+          {currentUser.role === 'admin' 
+            ? 'You can manage all team members and leaders' 
+            : 'You can manage team members only'}
+        </p>
+      </div>
+
+      {error && (
+        <div style={{
+          padding: '12px',
+          background: '#fee2e2',
+          color: '#991b1b',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          border: '1px solid #fecaca'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Users Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+        gap: '20px',
+        marginBottom: '20px'
+      }}>
+        {users.map(user => {
+          const roleColor = getRoleColor(user.role)
+          const isCurrentUser = user.id === currentUser.id || user._id?.toString() === currentUser.id
+          const canManage = canManageUser(user)
+
+          return (
+            <div
+              key={user.id || user._id}
+              style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                border: isCurrentUser ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                position: 'relative'
+              }}
+            >
+              {isCurrentUser && (
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: '#3b82f6',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: '600'
+                }}>
+                  YOU
+                </div>
+              )}
+
+              <div style={{ marginBottom: '15px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: '#1f2937' }}>{user.name}</h3>
+                <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: '14px' }}>
+                  @{user.username}
+                </p>
+                <span style={{
+                  display: 'inline-block',
+                  padding: '4px 12px',
+                  borderRadius: '16px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  background: roleColor.bg,
+                  color: roleColor.text,
+                  textTransform: 'uppercase'
+                }}>
+                  {user.role}
+                </span>
+              </div>
+
+              <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '15px' }}>
+                Joined {new Date(user.createdAt).toLocaleDateString()}
+              </p>
+
+              {canManage && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => {
+                      setEditingUser(user)
+                      setEditName(user.name)
+                      setEditRole(user.role)
+                      setError('')
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      setChangingPasswordFor(user)
+                      setShowPasswordModal(true)
+                      setNewPassword('')
+                      setError('')
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#f59e0b',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    🔑 Password
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(user)}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {users.length === 0 && (
+        <p style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+          No users found
+        </p>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }}>
+            <h3 style={{ marginTop: 0, color: '#1f2937' }}>Edit User: {editingUser.name}</h3>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#374151', fontWeight: '500' }}>
+                Name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#374151', fontWeight: '500' }}>
+                Role
+              </label>
+              <select
+                value={editRole}
+                onChange={e => setEditRole(e.target.value as 'admin' | 'leader' | 'user')}
+                disabled={currentUser.role === 'leader'}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  background: currentUser.role === 'leader' ? '#f3f4f6' : 'white',
+                  cursor: currentUser.role === 'leader' ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <option value="user">User</option>
+                <option value="leader">Leader</option>
+                {currentUser.role === 'admin' && <option value="admin">Admin</option>}
+              </select>
+              {currentUser.role === 'leader' && (
+                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  Leaders cannot change user roles
+                </p>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setEditingUser(null)
+                  setError('')
+                }}
+                style={{
+                  padding: '10px 20px',
+                  background: '#e5e7eb',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateUser}
+                style={{
+                  padding: '10px 20px',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && changingPasswordFor && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }}>
+            <h3 style={{ marginTop: 0, color: '#1f2937' }}>
+              Change Password for: {changingPasswordFor.name}
+            </h3>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#374151', fontWeight: '500' }}>
+                New Password (min 8 characters)
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                minLength={8}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false)
+                  setChangingPasswordFor(null)
+                  setNewPassword('')
+                  setError('')
+                }}
+                style={{
+                  padding: '10px 20px',
+                  background: '#e5e7eb',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangePassword}
+                disabled={newPassword.length < 8}
+                style={{
+                  padding: '10px 20px',
+                  background: newPassword.length < 8 ? '#9ca3af' : '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: newPassword.length < 8 ? 'not-allowed' : 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                Update Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

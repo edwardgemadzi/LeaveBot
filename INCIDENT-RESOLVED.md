@@ -15,14 +15,14 @@
 - Security fix pushed to GitHub
 
 ### ✅ 2. MongoDB Credentials Rotated
-- Old password: `9qGsGyP1btSulfF8` ❌ (COMPROMISED - now invalid)
-- New password: `4AuJfiFNpxw5RuXF` ✅ (Active and tested)
+- Old password: `<REDACTED>` ❌ (COMPROMISED - now invalid)
+- New password: `<REDACTED>` ✅ (Active and tested)
 - Username: `leavebot` (unchanged)
 - Connection tested and verified working
 
 ### ✅ 3. JWT Secret Rotated
-- Old secret: `0f9OBraUVEirfoYezCvxKkA0sqmLl1tzeB/DS+r815A=` ❌ (COMPROMISED)
-- New secret: `zymhin-sopraf-2qohDa` ✅ (Active)
+- Old secret: `<REDACTED>` ❌ (COMPROMISED)
+- New secret: `<REDACTED>` ✅ (Active)
 
 ### ✅ 4. Local Environment Updated
 - `.env` file updated with new credentials
@@ -41,12 +41,12 @@
 
 1. **MONGODB_URI**
    ```
-   mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
+   mongodb+srv://leavebot:<YOUR_NEW_PASSWORD>@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
    ```
 
 2. **JWT_SECRET**
    ```
-   zymhin-sopraf-2qohDa
+   <YOUR_NEW_JWT_SECRET>
    ```
 
 **Important:**
