@@ -24,12 +24,12 @@ But your frontend gets "Failed to load users" because the API can't:
 
    **Variable 1:**
    - Key: `MONGODB_URI`
-   - Value: `mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot`
+   - Value: `[Your MongoDB connection string from .env file]`
    - Environment: **Production** (check the box)
 
    **Variable 2:**
    - Key: `JWT_SECRET`
-   - Value: `zymhin-sopraf-2qohDa`
+   - Value: `[Your JWT secret from .env file]`
    - Environment: **Production** (check the box)
 
    **Variable 3 (optional for dev):**
@@ -56,11 +56,11 @@ cd /Users/edward/LeaveBot
 
 # Add MongoDB URI
 vercel env add MONGODB_URI production
-# When prompted, paste: mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot?retryWrites=true&w=majority&appName=leavebot
+# When prompted, paste: [Your MongoDB connection string from .env]
 
 # Add JWT Secret
 vercel env add JWT_SECRET production
-# When prompted, paste: zymhin-sopraf-2qohDa
+# When prompted, paste: [Your JWT secret from .env]
 
 # Redeploy
 vercel --prod
@@ -167,7 +167,7 @@ vercel env ls
 **3. Verify MongoDB connection:**
 ```bash
 # Test MongoDB connection string locally
-mongosh "mongodb+srv://leavebot:4AuJfiFNpxw5RuXF@leavebot.kih8gyg.mongodb.net/leavebot"
+mongosh "[Your MongoDB connection string]"
 ```
 
 **4. Check if .env is in .gitignore:**
