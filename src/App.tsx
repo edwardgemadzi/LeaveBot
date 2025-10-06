@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import './App.css'
 import Dashboard from './components/Dashboard'
 import LeaveCalendar from './components/LeaveCalendar'
 import UserManagement from './components/UserManagement'
 import TeamManagement from './components/TeamManagement'
+import { ToastContainer } from './components/Toast'
+import { useToast } from './hooks/useToast'
+import { EmptyState } from './components/EmptyState'
+import { LeaveCardSkeleton } from './components/LoadingSkeleton'
+import { SearchFilter } from './components/SearchFilter'
 
 type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams'
 
 function App() {
+  const { toasts, success, error: showError, info, closeToast } = useToast()
   const [user, setUser] = useState<any>(null)
   const [token, setToken] = useState<string>('')
   const [username, setUsername] = useState('')
@@ -24,6 +30,20 @@ function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard')
   const [availableTeams, setAvailableTeams] = useState<any[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState('')
+  const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
+
+  // Filter leaves based on search and status
+  const filteredLeaves = useMemo(() => {
+    return leaves.filter(leave => {
+      const matchesSearch = !searchFilter.search || 
+        leave.employeeName.toLowerCase().includes(searchFilter.search.toLowerCase()) ||
+        (leave.reason && leave.reason.toLowerCase().includes(searchFilter.search.toLowerCase()))
+      
+      const matchesStatus = !searchFilter.status || leave.status === searchFilter.status
+      
+      return matchesSearch && matchesStatus
+    })
+  }, [leaves, searchFilter])
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -74,6 +94,7 @@ function App() {
         localStorage.setItem('user', JSON.stringify(data.user))
         localStorage.setItem('token', data.token)
         setPassword('') // Clear password from memory
+        success(`Welcome back, ${data.user.name}!`)
         loadLeaves(data.token)
       } else {
         setError(data.error || 'Login failed')
@@ -113,7 +134,9 @@ function App() {
         setSelectedTeamId('')
         loadLeaves(data.token)
         if (data.message) {
-          alert(data.message)
+          success(data.message)
+        } else {
+          success(`Welcome, ${data.user.name}!`)
         }
       } else {
         setError(data.error || 'Registration failed')
@@ -173,11 +196,12 @@ function App() {
       }
       
       if (data.success) {
-        alert('Leave request submitted!')
+        success('Leave request submitted successfully!')
         setEmployeeName('')
         setStartDate('')
         setEndDate('')
         setReason('')
+        setCurrentView('list')
         loadLeaves()
       } else {
         setError(data.error || 'Failed to submit leave request')
@@ -199,7 +223,9 @@ function App() {
 
   if (!user) {
     return (
-      <div style={{maxWidth:'400px',margin:'100px auto',padding:'20px'}}>
+      <>
+        <ToastContainer toasts={toasts} onClose={closeToast} />
+        <div style={{maxWidth:'400px',margin:'100px auto',padding:'20px'}}>
         <h1>LeaveBot {isRegistering ? 'Register' : 'Login'}</h1>
         {error && <div style={{padding:'10px',background:'#f8d7da',color:'#721c24',borderRadius:'5px',marginBottom:'10px'}}>{error}</div>}
         
@@ -280,10 +306,13 @@ function App() {
           </ul>
         </div>
       </div>
+      </>
     )
   }
 
   return (
+    <>
+      <ToastContainer toasts={toasts} onClose={closeToast} />
     <div style={{maxWidth:'1200px',margin:'0 auto',padding:'20px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
         <h1>LeaveBot - Welcome {user.name}!</h1>
@@ -346,7 +375,7 @@ function App() {
 
       {/* View Content */}
       {currentView === 'dashboard' && (
-        <Dashboard user={user} leaves={leaves} />
+        <Dashboard user={user} leaves={leaves} token={token} />
       )}
 
       {currentView === 'calendar' && (
@@ -413,17 +442,47 @@ function App() {
       {currentView === 'list' && (
         <div style={{marginTop:'30px'}}>
           <h2>Leave Requests</h2>
-          {leaves.length === 0 ? (
-            <p style={{textAlign:'center',color:'#9ca3af',padding:'40px'}}>No leave requests yet</p>
+          
+          <SearchFilter 
+            onFilterChange={setSearchFilter}
+            resultCount={filteredLeaves.length}
+          />
+
+          {loading ? (
+            <div className="space-y-4 mt-6">
+              <LeaveCardSkeleton />
+              <LeaveCardSkeleton />
+              <LeaveCardSkeleton />
+            </div>
+          ) : filteredLeaves.length === 0 ? (
+            leaves.length === 0 ? (
+              <EmptyState 
+                icon="leaves"
+                title="No leave requests yet"
+                description="Submit your first leave request to get started. Your team and admin will be notified for approval."
+                action={{
+                  label: '✏️ Request Leave',
+                  onClick: () => setCurrentView('form')
+                }}
+              />
+            ) : (
+              <EmptyState 
+                icon="leaves"
+                title="No matching requests"
+                description="Try adjusting your search or filters to find what you're looking for."
+              />
+            )
           ) : (
             <div>
-              {leaves.map(leave => (
+              {filteredLeaves.map(leave => (
                 <LeaveCard 
                   key={leave.id} 
                   leave={leave} 
                   isAdmin={user.role === 'admin'}
                   onStatusUpdate={() => loadLeaves()}
                   token={token}
+                  showToast={success}
+                  showError={showError}
                 />
               ))}
             </div>
@@ -431,6 +490,7 @@ function App() {
         </div>
       )}
     </div>
+    </>
   )
 }
 
@@ -461,11 +521,13 @@ function NavTab({ active, onClick, icon, label }: { active: boolean; onClick: ()
 }
 
 // Leave Card Component with Admin Actions
-function LeaveCard({ leave, isAdmin, onStatusUpdate, token }: { 
+function LeaveCard({ leave, isAdmin, onStatusUpdate, token, showToast, showError }: { 
   leave: any; 
   isAdmin: boolean; 
   onStatusUpdate: () => void;
   token: string;
+  showToast: (msg: string) => void;
+  showError: (msg: string) => void;
 }) {
   const [updating, setUpdating] = useState(false)
 
@@ -482,13 +544,13 @@ function LeaveCard({ leave, isAdmin, onStatusUpdate, token }: {
       })
       
       if (res.ok) {
-        alert(`Leave request ${status}!`)
+        showToast(`Leave request ${status} successfully!`)
         onStatusUpdate()
       } else {
-        alert('Failed to update leave request')
+        showError('Failed to update leave request')
       }
     } catch (err) {
-      alert('Network error. Please try again.')
+      showError('Network error. Please try again.')
     } finally {
       setUpdating(false)
     }

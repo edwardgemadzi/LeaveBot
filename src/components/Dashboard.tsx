@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { LeaveBalance } from './LeaveBalance'
 
 interface Leave {
   _id: string
@@ -21,9 +22,10 @@ interface User {
 interface DashboardProps {
   user: User
   leaves: Leave[]
+  token?: string
 }
 
-export default function Dashboard({ user, leaves }: DashboardProps) {
+export default function Dashboard({ user, leaves, token }: DashboardProps) {
   const stats = useMemo(() => {
     if (user.role === 'admin') {
       // Admin sees all leaves statistics
@@ -89,6 +91,11 @@ export default function Dashboard({ user, leaves }: DashboardProps) {
       <h2 style={{ marginBottom: '30px', color: '#333' }}>
         {user.role === 'admin' ? 'Admin Dashboard' : 'My Dashboard'}
       </h2>
+
+      {/* Leave Balance - Only show for regular users */}
+      {user.role !== 'admin' && token && (
+        <LeaveBalance userId={user.id} token={token} />
+      )}
 
       {/* Statistics Cards */}
       <div style={{
