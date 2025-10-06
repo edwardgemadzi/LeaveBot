@@ -41,6 +41,16 @@ export default async function handler(req, res) {
     // Check if this is a password change request (has action=password query param)
     const { action, id } = req.query;
 
+    // GET /api/users?id={userId}&action=settings - Get user settings
+    if (req.method === 'GET' && id && action === 'settings') {
+      return await handleGetUserSettings(req, res, decoded, startTime, id);
+    }
+
+    // PUT /api/users?id={userId}&action=settings - Update user settings
+    if (req.method === 'PUT' && id && action === 'settings') {
+      return await handleUpdateUserSettings(req, res, decoded, startTime, id);
+    }
+
     // POST /api/users?action=password - Change password
     if (req.method === 'POST' && action === 'password') {
       return await handlePasswordChange(req, res, decoded, startTime);
@@ -413,3 +423,206 @@ async function handleDeleteUser(req, res, decoded, startTime, userId) {
     message: 'User and associated leave requests deleted successfully'
   });
 }
+
+// Handler: Get user settings
+async function handleGetUserSettings(req, res, decoded, startTime, id) {
+  const usersCollection = req.usersCollection;
+  const teamsCollection = req.teamsCollection;
+
+  // Validate user ID
+  const userIdValidation = validateUserId(id);
+  if (!userIdValidation.valid) {
+    return res.status(400).json({ success: false, error: userIdValidation.error });
+  }
+
+  // Fetch user
+  const user = await usersCollection.findOne({ _id: new ObjectId(userIdValidation.value) });
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  // Check authorization: user can get their own settings, or admins can get any
+  if (decoded.role !== 'admin' && decoded.id !== user._id.toString()) {
+    return res.status(403).json({ 
+      success: false, 
+      error: 'Unauthorized: You can only view your own settings' 
+    });
+  }
+
+  // Get user settings or fallback to team defaults
+  let settings = user.settings || {};
+
+  // If no user settings, try to get team defaults
+  if (Object.keys(settings).length === 0 && user.team) {
+    const team = await teamsCollection.findOne({ _id: new ObjectId(user.team) });
+    if (team && team.settings && team.settings.defaults) {
+      settings = team.settings.defaults;
+    }
+  }
+
+  // Apply system defaults if still empty
+  if (Object.keys(settings).length === 0) {
+    settings = {
+      shiftPattern: { type: 'regular' },
+      shiftTime: { type: 'day' },
+      workingDays: {
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: false,
+        sunday: false
+      }
+    };
+  }
+
+  logger.info('User settings retrieved', { 
+    userId: user._id.toString(),
+    username: user.username,
+    hasCustomSettings: !!user.settings,
+    requestedBy: decoded.username
+  });
+
+  const duration = Date.now() - startTime;
+  logger.response(req, res, duration);
+
+  return res.status(200).json({ 
+    success: true, 
+    settings,
+    hasCustomSettings: !!user.settings
+  });
+}
+
+// Handler: Update user settings
+async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
+  const usersCollection = req.usersCollection;
+
+  // Validate user ID
+  const userIdValidation = validateUserId(id);
+  if (!userIdValidation.valid) {
+    return res.status(400).json({ success: false, error: userIdValidation.error });
+  }
+
+  // Fetch user
+  const user = await usersCollection.findOne({ _id: new ObjectId(userIdValidation.value) });
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  // Check authorization: user can update their own settings, or admins can update any
+  if (decoded.role !== 'admin' && decoded.id !== user._id.toString()) {
+    return res.status(403).json({ 
+      success: false, 
+      error: 'Unauthorized: You can only update your own settings' 
+    });
+  }
+
+  // Validate settings structure
+  const { shiftPattern, shiftTime, workingDays } = req.body;
+
+  const newSettings = {};
+
+  // Validate shift pattern
+  if (shiftPattern) {
+    if (!shiftPattern.type) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Shift pattern must have a type' 
+      });
+    }
+
+    const validPatterns = ['regular', '2-2', '3-3', '4-4', '5-5'];
+    if (!validPatterns.includes(shiftPattern.type)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid shift pattern type. Must be one of: ${validPatterns.join(', ')}` 
+      });
+    }
+
+    // For rotation patterns, require reference date
+    if (shiftPattern.type !== 'regular' && !shiftPattern.referenceDate) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Rotation shift patterns require a reference date' 
+      });
+    }
+
+    newSettings.shiftPattern = shiftPattern;
+  }
+
+  // Validate shift time
+  if (shiftTime) {
+    if (!shiftTime.type) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Shift time must have a type' 
+      });
+    }
+
+    const validTimes = ['day', 'night'];
+    if (!validTimes.includes(shiftTime.type)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid shift time type. Must be one of: ${validTimes.join(', ')}` 
+      });
+    }
+
+    newSettings.shiftTime = shiftTime;
+  }
+
+  // Validate working days
+  if (workingDays) {
+    const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const workingDaysObj = {};
+    let hasAtLeastOneDay = false;
+
+    for (const day of validDays) {
+      if (workingDays.hasOwnProperty(day)) {
+        if (typeof workingDays[day] !== 'boolean') {
+          return res.status(400).json({ 
+            success: false, 
+            error: `Working day '${day}' must be a boolean` 
+          });
+        }
+        workingDaysObj[day] = workingDays[day];
+        if (workingDays[day]) hasAtLeastOneDay = true;
+      }
+    }
+
+    if (!hasAtLeastOneDay) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'At least one working day must be selected' 
+      });
+    }
+
+    newSettings.workingDays = workingDaysObj;
+  }
+
+  // Merge with existing settings
+  const updatedSettings = { ...user.settings, ...newSettings };
+
+  // Update user settings
+  await usersCollection.updateOne(
+    { _id: new ObjectId(userIdValidation.value) },
+    { $set: { settings: updatedSettings } }
+  );
+
+  logger.info('User settings updated', { 
+    userId: user._id.toString(),
+    username: user.username,
+    updatedFields: Object.keys(newSettings),
+    updatedBy: decoded.username
+  });
+
+  const duration = Date.now() - startTime;
+  logger.response(req, res, duration);
+
+  return res.status(200).json({ 
+    success: true, 
+    message: 'User settings updated successfully',
+    settings: updatedSettings
+  });
+}
+

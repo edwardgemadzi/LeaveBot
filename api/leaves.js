@@ -117,7 +117,46 @@ export default async function handler(req, res) {
       const targetUserId = userId || auth.user.id;
       const user = await usersCollection.findOne({ _id: new ObjectId(targetUserId) });
       
-      let teamSettings = getDefaultTeamSettings();
+      // Get user settings first, fallback to team defaults, then system defaults
+      let userSettings = user?.settings || null;
+      
+      if (!userSettings || Object.keys(userSettings).length === 0) {
+        // Try team defaults
+        if (user?.teamId) {
+          const team = await teamsCollection.findOne({ _id: user.teamId });
+          if (team?.settings?.defaults) {
+            userSettings = team.settings.defaults;
+          }
+        }
+      }
+      
+      // If still no settings, use system defaults
+      if (!userSettings || Object.keys(userSettings).length === 0) {
+        userSettings = {
+          shiftPattern: { type: 'regular' },
+          shiftTime: { type: 'day' },
+          workingDays: {
+            monday: true,
+            tuesday: true,
+            wednesday: true,
+            thursday: true,
+            friday: true,
+            saturday: false,
+            sunday: false
+          }
+        };
+      }
+
+      // Calculate working days based on user settings
+      const result = calculateWorkingDays(
+        start,
+        end,
+        userSettings.shiftPattern,
+        userSettings.workingDays
+      );
+
+      // Get team settings for concurrent leave checking
+      let teamSettings = null;
       if (user?.teamId) {
         const team = await teamsCollection.findOne({ _id: user.teamId });
         if (team?.settings) {
@@ -125,19 +164,11 @@ export default async function handler(req, res) {
         }
       }
 
-      // Calculate working days based on team settings
-      const result = calculateWorkingDays(
-        start,
-        end,
-        teamSettings.shiftPattern,
-        teamSettings.workingDays
-      );
-
       // Check concurrent leave limits if enabled
       let concurrentWarning = null;
       let concurrentCount = 0;
       
-      if (teamSettings.concurrentLeave?.enabled && user?.teamId) {
+      if (teamSettings?.concurrentLeave?.enabled && user?.teamId) {
         // Find overlapping leaves
         const overlappingLeaves = await leavesCollection.find({
           status: 'approved',
