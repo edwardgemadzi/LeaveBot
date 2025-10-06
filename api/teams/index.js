@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const { MongoClient } = require('mongodb');
+import jwt from 'jsonwebtoken';
+import { MongoClient } from 'mongodb';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -13,7 +13,7 @@ async function connectDB() {
   return client;
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
