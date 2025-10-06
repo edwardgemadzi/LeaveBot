@@ -72,7 +72,7 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
 
     setError('')
     try {
-      const res = await fetch(`/api/users/${editingUser.id || editingUser._id}`, {
+      const res = await fetch(`/api/users?id=${editingUser.id || editingUser._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
 
     setError('')
     try {
-      const res = await fetch(`/api/users/${user.id || user._id}`, {
+      const res = await fetch(`/api/users?id=${user.id || user._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -135,7 +135,7 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
 
     setError('')
     try {
-      const res = await fetch(`/api/users/${changingPasswordFor.id || changingPasswordFor._id}/password`, {
+      const res = await fetch(`/api/users?id=${changingPasswordFor.id || changingPasswordFor._id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +178,7 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
     setError('')
     setAddingUser(true)
     try {
-      const res = await fetch('/api/users/create', {
+      const res = await fetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

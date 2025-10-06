@@ -99,7 +99,7 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
   };
 
   const loadTeamMembers = async (teamId: string) => {
-    const response = await fetch(`/api/teams/${teamId}`, {
+    const response = await fetch(`/api/teams?id=${teamId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     
@@ -145,7 +145,7 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
     setError(null);
 
     try {
-      const response = await fetch(`/api/teams/${selectedTeam._id}`, {
+      const response = await fetch(`/api/teams?id=${selectedTeam._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +178,7 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
 
     setError(null);
     try {
-      const response = await fetch(`/api/teams/${teamId}`, {
+      const response = await fetch(`/api/teams?id=${teamId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -197,7 +197,7 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
   const handleAssignUser = async (userId: string, teamId: string) => {
     setError(null);
     try {
-      const response = await fetch(`/api/teams/${teamId}/assign`, {
+      const response = await fetch(`/api/teams?id=${teamId}&action=assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -225,7 +225,7 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
 
     setError(null);
     try {
-      const response = await fetch(`/api/teams/${teamId}/remove`, {
+      const response = await fetch(`/api/teams?id=${teamId}&action=remove`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
