@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		color-scheme: light;
+	}
+
+	html,
+	body,
+	#root {
+		@apply h-full;
+	}
+
+	body {
+		@apply bg-surface-50 text-slate-900 font-sans antialiased;
+		background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15), transparent 55%),
+			radial-gradient(circle at 100% 100%, rgba(14, 165, 233, 0.12), transparent 50%),
+			#f8fafc;
+	}
+
+	::selection {
+		@apply bg-brand-500/20 text-brand-800;
+	}
+}
+
+@layer components {
+	.glass-panel {
+		@apply bg-white/80 backdrop-blur border border-white/60 shadow-card rounded-2xl;
+	}
+
+	.card {
+		@apply rounded-2xl border border-slate-100 bg-white shadow-card;
+	}
+
+	.card-header {
+		@apply flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4;
+	}
+
+	.card-body {
+		@apply px-6 py-5;
+	}
+
+	.btn-primary {
+		@apply inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:bg-brand-300;
+	}
+
+	.btn-secondary {
+		@apply inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-soft ring-1 ring-slate-200 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-60;
+	}
+
+	.badge {
+		@apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold;
+	}
+
+	.badge-success {
+		@apply badge bg-emerald-100 text-emerald-700;
+	}
+
+	.badge-warning {
+		@apply badge bg-amber-100 text-amber-700;
+	}
+
+	.badge-danger {
+		@apply badge bg-rose-100 text-rose-700;
+	}
+}
+
+/* react-big-calendar overrides */
+.rbc-calendar {
+	@apply rounded-2xl border border-slate-200 bg-white shadow-card;
+}
+
+.rbc-toolbar button {
+	@apply rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-none transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-600;
+}
+
+.rbc-toolbar button.rbc-active {
+	@apply border-brand-400 bg-brand-500 text-white hover:bg-brand-600;
+}
+
+.rbc-off-range-bg {
+	@apply bg-slate-50;
+}
+
+.rbc-today {
+	@apply bg-brand-50;
+}
+
+.rbc-event {
+	@apply rounded-xl border-none px-2 py-1 text-xs font-semibold shadow-none;
+}
+
+.rbc-event-label {
+	@apply text-[10px] font-medium text-white/80;
+}
+
+.rbc-agenda-event-cell,
+.rbc-agenda-time-cell,
+.rbc-agenda-date-cell {
+	@apply px-4 py-2 text-sm;
+}
