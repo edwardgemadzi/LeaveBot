@@ -1,266 +1,181 @@
-import jwt from 'jsonwebtoken'
-import bcrypt from 'bcryptjs'
-import { 
-  JWT_SECRET, 
-  getAllUsers, 
-  getUserById, 
-  updateUser, 
-  deleteUser,
-  createUser
-} from './shared/mongodb-storage.js'
-import { ObjectId } from 'mongodb'
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { MongoClient, ObjectId } = require('mongodb');
 
-// Helper to verify JWT and check permissions
+const MONGODB_URI = process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET;
+let cachedClient = null;
+
+async function connectToDatabase() {
+  if (cachedClient) {
+    return cachedClient;
+  }
+  const client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  cachedClient = client;
+  return client;
+}
+
 function authenticateAndAuthorize(req, requiredRoles = []) {
-  const authHeader = req.headers.authorization
+  const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { error: 'Unauthorized', status: 401 }
+    return { error: 'Unauthorized', status: 401 };
   }
 
   try {
-    const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, JWT_SECRET);
     
     if (requiredRoles.length > 0 && !requiredRoles.includes(decoded.role)) {
-      return { error: 'Forbidden: Insufficient permissions', status: 403 }
+      return { error: 'Forbidden: Insufficient permissions', status: 403 };
     }
     
-    return { user: decoded }
+    return { user: decoded };
   } catch (err) {
-    return { error: 'Invalid or expired token', status: 401 }
+    return { error: 'Invalid or expired token', status: 401 };
   }
 }
 
-export default async function handler(req, res) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+module.exports = async function handler(req, res) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+    return res.status(200).end();
   }
 
-  const { id } = req.query
+  const { id } = req.query;
+  const auth = authenticateAndAuthorize(req, ['admin', 'leader']);
+  
+  if (auth.error) {
+    return res.status(auth.status).json({ success: false, error: auth.error });
+  }
 
-  // GET /api/users - List all users
-  // GET /api/users?id=xxx - Get specific user
-  if (req.method === 'GET') {
-    const auth = authenticateAndAuthorize(req, ['admin', 'leader'])
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error })
-    }
+  try {
+    const client = await connectToDatabase();
+    const db = client.db('leavebot');
+    const usersCollection = db.collection('users');
 
-    try {
+    // GET - List all users or get specific user
+    if (req.method === 'GET') {
       if (id) {
-        // Get specific user
-        const user = await getUserById(new ObjectId(id))
+        const user = await usersCollection.findOne({ _id: new ObjectId(id) });
         if (!user) {
-          return res.status(404).json({ success: false, error: 'User not found' })
+          return res.status(404).json({ success: false, error: 'User not found' });
         }
         
-        // Leaders cannot view admins
         if (auth.user.role === 'leader' && user.role === 'admin') {
-          return res.status(403).json({ success: false, error: 'Access denied' })
+          return res.status(403).json({ success: false, error: 'Access denied' });
         }
         
-        const { passwordHash, ...safeUser } = user
-        return res.status(200).json({ success: true, user: { ...safeUser, id: user._id.toString() } })
+        const { passwordHash, ...safeUser } = user;
+        return res.status(200).json({ success: true, user: { ...safeUser, id: user._id.toString() } });
       } else {
-        // Get all users
-        const users = await getAllUsers()
+        let users = await usersCollection.find({}).toArray();
         
-        // Leaders can only see users and other leaders, not admins
-        let filteredUsers = users
         if (auth.user.role === 'leader') {
-          filteredUsers = users.filter(u => u.role !== 'admin')
+          users = users.filter(u => u.role !== 'admin');
         }
         
-        // Remove password hashes from response
-        const safeUsers = filteredUsers.map(({ passwordHash, ...user }) => ({
+        const safeUsers = users.map(({ passwordHash, ...user }) => ({
           ...user,
           id: user._id.toString()
-        }))
+        }));
         
-        return res.status(200).json({ success: true, users: safeUsers })
+        return res.status(200).json({ success: true, users: safeUsers });
       }
-    } catch (error) {
-      console.error('Error fetching users:', error)
-      return res.status(500).json({ success: false, error: 'Failed to fetch users' })
-    }
-  }
-
-  // POST /api/users - Create new user (admin and leader can create)
-  if (req.method === 'POST') {
-    const auth = authenticateAndAuthorize(req, ['admin', 'leader'])
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error })
     }
 
-    try {
-      const { username, password, name, role, teamId } = req.body
-
-      if (!username || !password || !name) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Username, password, and name are required' 
-        })
+    // POST - Create new user
+    if (req.method === 'POST') {
+      const { username, password, name, role } = req.body;
+      
+      if (!username || !password || !name || !role) {
+        return res.status(400).json({ success: false, error: 'All fields required' });
       }
 
-      // Leaders can only create regular users
-      if (auth.user.role === 'leader' && role && role !== 'user') {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Leaders can only create regular users' 
-        })
+      if (auth.user.role === 'leader' && role === 'admin') {
+        return res.status(403).json({ success: false, error: 'Leaders cannot create admins' });
       }
 
-      // Check if username already exists
-      const users = await getAllUsers()
-      const existingUser = users.find(u => u.username === username)
-      if (existingUser) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Username already exists' 
-        })
+      const existing = await usersCollection.findOne({ username });
+      if (existing) {
+        return res.status(400).json({ success: false, error: 'Username already exists' });
       }
 
-      // Hash password
-      const passwordHash = await bcrypt.hash(password, 10)
-
-      // Create user
-      const newUser = {
+      const passwordHash = await bcrypt.hash(password, 10);
+      const result = await usersCollection.insertOne({
         username,
         passwordHash,
         name,
-        role: role || 'user',
-        teamId: teamId || null,
+        role,
         createdAt: new Date()
-      }
+      });
 
-      const userId = await createUser(newUser)
-      
       return res.status(201).json({ 
         success: true, 
-        message: 'User created successfully',
-        userId: userId.toString()
-      })
-    } catch (error) {
-      console.error('Error creating user:', error)
-      return res.status(500).json({ success: false, error: 'Failed to create user' })
-    }
-  }
-
-  // PUT /api/users?id=xxx - Update user
-  if (req.method === 'PUT') {
-    const auth = authenticateAndAuthorize(req, ['admin', 'leader'])
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error })
+        user: { id: result.insertedId.toString(), username, name, role } 
+      });
     }
 
-    if (!id) {
-      return res.status(400).json({ success: false, error: 'User ID is required' })
+    // PUT - Update user
+    if (req.method === 'PUT') {
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'User ID required' });
+      }
+
+      const updates = {};
+      if (req.body.name) updates.name = req.body.name;
+      if (req.body.role) {
+        if (auth.user.role === 'leader' && req.body.role === 'admin') {
+          return res.status(403).json({ success: false, error: 'Cannot promote to admin' });
+        }
+        updates.role = req.body.role;
+      }
+      if (req.body.password) {
+        updates.passwordHash = await bcrypt.hash(req.body.password, 10);
+      }
+
+      updates.updatedAt = new Date();
+
+      const result = await usersCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updates }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+
+      return res.status(200).json({ success: true, message: 'User updated' });
     }
 
-    try {
-      const updates = req.body
-
-      // Get the user being updated
-      const targetUser = await getUserById(new ObjectId(id))
-      if (!targetUser) {
-        return res.status(404).json({ success: false, error: 'User not found' })
+    // DELETE - Delete user
+    if (req.method === 'DELETE') {
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'User ID required' });
       }
 
-      // Leaders cannot update admins or other leaders
-      if (auth.user.role === 'leader' && targetUser.role !== 'user') {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Leaders can only manage regular users' 
-        })
+      if (auth.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Only admins can delete users' });
       }
 
-      // Leaders cannot promote users
-      if (auth.user.role === 'leader' && updates.role && updates.role !== 'user') {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Leaders cannot change user roles' 
-        })
-      }
-
-      // Prevent self-demotion
-      if (id === auth.user.id && updates.role && updates.role !== auth.user.role) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Cannot change your own role' 
-        })
-      }
-
-      // If password is being updated, hash it
-      if (updates.password) {
-        updates.passwordHash = await bcrypt.hash(updates.password, 10)
-        delete updates.password
-      }
-
-      const success = await updateUser(new ObjectId(id), updates)
+      const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
       
-      if (success) {
-        return res.status(200).json({ success: true, message: 'User updated successfully' })
-      } else {
-        return res.status(500).json({ success: false, error: 'Failed to update user' })
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ success: false, error: 'User not found' });
       }
-    } catch (error) {
-      console.error('Error updating user:', error)
-      return res.status(500).json({ success: false, error: 'Failed to update user' })
+
+      return res.status(200).json({ success: true, message: 'User deleted' });
     }
+
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
+
+  } catch (error) {
+    console.error('Error in users API:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
-
-  // DELETE /api/users?id=xxx - Delete user
-  if (req.method === 'DELETE') {
-    const auth = authenticateAndAuthorize(req, ['admin', 'leader'])
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error })
-    }
-
-    if (!id) {
-      return res.status(400).json({ success: false, error: 'User ID is required' })
-    }
-
-    try {
-      // Prevent self-deletion
-      if (id === auth.user.id) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Cannot delete your own account' 
-        })
-      }
-
-      // Get the user being deleted
-      const targetUser = await getUserById(new ObjectId(id))
-      if (!targetUser) {
-        return res.status(404).json({ success: false, error: 'User not found' })
-      }
-
-      // Leaders cannot delete admins or other leaders
-      if (auth.user.role === 'leader' && targetUser.role !== 'user') {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Leaders can only delete regular users' 
-        })
-      }
-
-      const success = await deleteUser(new ObjectId(id))
-      
-      if (success) {
-        return res.status(200).json({ success: true, message: 'User deleted successfully' })
-      } else {
-        return res.status(500).json({ success: false, error: 'Failed to delete user' })
-      }
-    } catch (error) {
-      console.error('Error deleting user:', error)
-      return res.status(500).json({ success: false, error: 'Failed to delete user' })
-    }
-  }
-
-  return res.status(405).json({ success: false, error: 'Method not allowed' })
-}
+};

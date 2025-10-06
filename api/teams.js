@@ -1,272 +1,214 @@
-import jwt from 'jsonwebtoken'
-import { 
-  JWT_SECRET, 
-  getAllTeams, 
-  getTeamById,
-  createTeam,
-  updateTeam,
-  deleteTeam,
-  getUsersByTeam,
-  assignUserToTeam,
-  removeUserFromTeam
-} from './shared/mongodb-storage.js'
-import { ObjectId } from 'mongodb'
+const jwt = require('jsonwebtoken');
+const { MongoClient, ObjectId } = require('mongodb');
 
-// Helper to verify JWT and check permissions
+const MONGODB_URI = process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET;
+let cachedClient = null;
+
+async function connectToDatabase() {
+  if (cachedClient) {
+    return cachedClient;
+  }
+  const client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  cachedClient = client;
+  return client;
+}
+
 function authenticateAndAuthorize(req, requiredRoles = []) {
-  const authHeader = req.headers.authorization
+  const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { error: 'Unauthorized', status: 401 }
+    return { error: 'Unauthorized', status: 401 };
   }
 
   try {
-    const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, JWT_SECRET);
     
     if (requiredRoles.length > 0 && !requiredRoles.includes(decoded.role)) {
-      return { error: 'Forbidden: Insufficient permissions', status: 403 }
+      return { error: 'Forbidden: Insufficient permissions', status: 403 };
     }
     
-    return { user: decoded }
+    return { user: decoded };
   } catch (err) {
-    return { error: 'Invalid or expired token', status: 401 }
+    return { error: 'Invalid or expired token', status: 401 };
   }
 }
 
-export default async function handler(req, res) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+module.exports = async function handler(req, res) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+    return res.status(200).end();
   }
 
-  const { id, action } = req.query
+  const { id, action } = req.query;
+  const auth = authenticateAndAuthorize(req, ['admin', 'leader']);
+  
+  if (auth.error) {
+    return res.status(auth.status).json({ success: false, error: auth.error });
+  }
 
-  // GET /api/teams - List all teams
-  // GET /api/teams?id=xxx - Get specific team with members
-  if (req.method === 'GET') {
-    const auth = authenticateAndAuthorize(req)
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error })
-    }
+  try {
+    const client = await connectToDatabase();
+    const db = client.db('leavebot');
+    const teamsCollection = db.collection('teams');
+    const usersCollection = db.collection('users');
 
-    try {
+    // GET - List all teams or get specific team
+    if (req.method === 'GET') {
       if (id) {
-        // Get specific team
-        const team = await getTeamById(new ObjectId(id))
+        const team = await teamsCollection.findOne({ _id: new ObjectId(id) });
         if (!team) {
-          return res.status(404).json({ success: false, error: 'Team not found' })
+          return res.status(404).json({ success: false, error: 'Team not found' });
         }
 
-        const members = await getUsersByTeam(new ObjectId(id))
-        
-        return res.status(200).json({ 
-          success: true, 
+        const members = await usersCollection.find({ 
+          teamId: new ObjectId(id) 
+        }).toArray();
+
+        const safeMembers = members.map(({ passwordHash, ...user }) => ({
+          ...user,
+          id: user._id.toString()
+        }));
+
+        return res.status(200).json({
+          success: true,
           team: {
             ...team,
             id: team._id.toString(),
-            members: members.map(({ passwordHash, ...user }) => ({
-              ...user,
-              id: user._id.toString()
-            }))
+            members: safeMembers
           }
-        })
+        });
       } else {
-        // Get all teams
-        const teams = await getAllTeams()
-        
-        // Get member counts for each team
-        const teamsWithMembers = await Promise.all(
-          teams.map(async (team) => {
-            const members = await getUsersByTeam(team._id)
-            return {
-              ...team,
-              id: team._id.toString(),
-              memberCount: members.length
-            }
-          })
-        )
-        
-        return res.status(200).json({ success: true, teams: teamsWithMembers })
-      }
-    } catch (error) {
-      console.error('Error fetching teams:', error)
-      return res.status(500).json({ success: false, error: 'Failed to fetch teams' })
-    }
-  }
+        const teams = await teamsCollection.find({}).toArray();
+        const teamsWithCount = await Promise.all(teams.map(async (team) => {
+          const memberCount = await usersCollection.countDocuments({ teamId: team._id });
+          return {
+            ...team,
+            id: team._id.toString(),
+            memberCount
+          };
+        }));
 
-  // POST /api/teams - Create new team
-  // POST /api/teams?id=xxx&action=assign - Assign user to team
-  // POST /api/teams?id=xxx&action=remove - Remove user from team
-  if (req.method === 'POST') {
-    if (id && action === 'assign') {
+        return res.status(200).json({ success: true, teams: teamsWithCount });
+      }
+    }
+
+    // POST - Create team, assign user, or remove user
+    if (req.method === 'POST') {
       // Assign user to team
-      const auth = authenticateAndAuthorize(req, ['admin'])
-      if (auth.error) {
-        return res.status(auth.status).json({ success: false, error: auth.error })
-      }
-
-      try {
-        const { userId } = req.body
-
+      if (id && action === 'assign') {
+        const { userId } = req.body;
         if (!userId) {
-          return res.status(400).json({ success: false, error: 'User ID is required' })
+          return res.status(400).json({ success: false, error: 'User ID required' });
         }
 
-        if (!ObjectId.isValid(id) || !ObjectId.isValid(userId)) {
-          return res.status(400).json({ success: false, error: 'Invalid ID format' })
+        const result = await usersCollection.updateOne(
+          { _id: new ObjectId(userId) },
+          { $set: { teamId: new ObjectId(id), updatedAt: new Date() } }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ success: false, error: 'User not found' });
         }
 
-        const success = await assignUserToTeam(new ObjectId(userId), new ObjectId(id))
-        
-        if (success) {
-          return res.status(200).json({ success: true, message: 'User assigned to team successfully' })
-        } else {
-          return res.status(500).json({ success: false, error: 'Failed to assign user to team' })
-        }
-      } catch (error) {
-        console.error('Error assigning user to team:', error)
-        return res.status(500).json({ success: false, error: error.message || 'Failed to assign user to team' })
+        return res.status(200).json({ success: true, message: 'User assigned to team' });
       }
-    } else if (id && action === 'remove') {
+
       // Remove user from team
-      const auth = authenticateAndAuthorize(req, ['admin'])
-      if (auth.error) {
-        return res.status(auth.status).json({ success: false, error: auth.error })
-      }
-
-      try {
-        const { userId } = req.body
-
+      if (id && action === 'remove') {
+        const { userId } = req.body;
         if (!userId) {
-          return res.status(400).json({ success: false, error: 'User ID is required' })
+          return res.status(400).json({ success: false, error: 'User ID required' });
         }
 
-        if (!ObjectId.isValid(id) || !ObjectId.isValid(userId)) {
-          return res.status(400).json({ success: false, error: 'Invalid ID format' })
+        const result = await usersCollection.updateOne(
+          { _id: new ObjectId(userId) },
+          { $unset: { teamId: '' }, $set: { updatedAt: new Date() } }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ success: false, error: 'User not found' });
         }
 
-        const success = await removeUserFromTeam(new ObjectId(userId))
-        
-        if (success) {
-          return res.status(200).json({ success: true, message: 'User removed from team successfully' })
-        } else {
-          return res.status(500).json({ success: false, error: 'Failed to remove user from team' })
-        }
-      } catch (error) {
-        console.error('Error removing user from team:', error)
-        return res.status(500).json({ success: false, error: error.message || 'Failed to remove user from team' })
+        return res.status(200).json({ success: true, message: 'User removed from team' });
       }
-    } else {
+
       // Create new team
-      const auth = authenticateAndAuthorize(req, ['admin'])
-      if (auth.error) {
-        return res.status(auth.status).json({ success: false, error: auth.error })
+      const { name, leaderId } = req.body;
+      if (!name || !leaderId) {
+        return res.status(400).json({ success: false, error: 'Name and leader ID required' });
       }
 
-      try {
-        const { name, description, leaderId } = req.body
+      const result = await teamsCollection.insertOne({
+        name,
+        leaderId: new ObjectId(leaderId),
+        createdAt: new Date()
+      });
 
-        if (!name) {
-          return res.status(400).json({ 
-            success: false, 
-            error: 'Team name is required' 
-          })
-        }
-
-        const teamData = {
-          name,
-          description: description || '',
-          leaderId: leaderId ? new ObjectId(leaderId) : null
-        }
-
-        const newTeam = await createTeam(teamData)
-        
-        return res.status(201).json({ 
-          success: true, 
-          message: 'Team created successfully',
-          team: {
-            ...newTeam,
-            id: newTeam._id.toString()
-          }
-        })
-      } catch (error) {
-        console.error('Error creating team:', error)
-        
-        if (error.code === 11000) {
-          return res.status(400).json({ 
-            success: false, 
-            error: 'Team name already exists' 
-          })
-        }
-        
-        return res.status(500).json({ 
-          success: false, 
-          error: 'Failed to create team' 
-        })
-      }
-    }
-  }
-
-  // PUT /api/teams?id=xxx - Update team
-  if (req.method === 'PUT') {
-    const auth = authenticateAndAuthorize(req, ['admin'])
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error })
+      return res.status(201).json({
+        success: true,
+        team: { id: result.insertedId.toString(), name, leaderId }
+      });
     }
 
-    if (!id) {
-      return res.status(400).json({ success: false, error: 'Team ID is required' })
-    }
-
-    try {
-      const updates = req.body
-
-      if (updates.leaderId) {
-        updates.leaderId = new ObjectId(updates.leaderId)
+    // PUT - Update team
+    if (req.method === 'PUT') {
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'Team ID required' });
       }
 
-      const success = await updateTeam(new ObjectId(id), updates)
+      const updates = {};
+      if (req.body.name) updates.name = req.body.name;
+      if (req.body.leaderId) updates.leaderId = new ObjectId(req.body.leaderId);
+      updates.updatedAt = new Date();
+
+      const result = await teamsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updates }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ success: false, error: 'Team not found' });
+      }
+
+      return res.status(200).json({ success: true, message: 'Team updated' });
+    }
+
+    // DELETE - Delete team
+    if (req.method === 'DELETE') {
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'Team ID required' });
+      }
+
+      if (auth.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Only admins can delete teams' });
+      }
+
+      // Remove team from all users
+      await usersCollection.updateMany(
+        { teamId: new ObjectId(id) },
+        { $unset: { teamId: '' } }
+      );
+
+      const result = await teamsCollection.deleteOne({ _id: new ObjectId(id) });
       
-      if (success) {
-        return res.status(200).json({ success: true, message: 'Team updated successfully' })
-      } else {
-        return res.status(500).json({ success: false, error: 'Failed to update team' })
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ success: false, error: 'Team not found' });
       }
-    } catch (error) {
-      console.error('Error updating team:', error)
-      return res.status(500).json({ success: false, error: 'Failed to update team' })
+
+      return res.status(200).json({ success: true, message: 'Team deleted' });
     }
+
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
+
+  } catch (error) {
+    console.error('Error in teams API:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
-
-  // DELETE /api/teams?id=xxx - Delete team
-  if (req.method === 'DELETE') {
-    const auth = authenticateAndAuthorize(req, ['admin'])
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error })
-    }
-
-    if (!id) {
-      return res.status(400).json({ success: false, error: 'Team ID is required' })
-    }
-
-    try {
-      const success = await deleteTeam(new ObjectId(id))
-      
-      if (success) {
-        return res.status(200).json({ success: true, message: 'Team deleted successfully' })
-      } else {
-        return res.status(500).json({ success: false, error: 'Failed to delete team' })
-      }
-    } catch (error) {
-      console.error('Error deleting team:', error)
-      return res.status(500).json({ success: false, error: 'Failed to delete team' })
-    }
-  }
-
-  return res.status(405).json({ success: false, error: 'Method not allowed' })
-}
+};
