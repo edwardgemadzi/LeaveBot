@@ -701,6 +701,49 @@ function LeaveCard({ leave, isAdmin, onStatusUpdate, token, showToast, showError
 
   const calendarDays = calculateCalendarDays(leave.startDate, leave.endDate)
   const workingDays = leave.workingDaysCount || calendarDays // Fall back to calendar days if not calculated
+  const [showConflictDialog, setShowConflictDialog] = useState(false)
+  const [conflictWarning, setConflictWarning] = useState('')
+  const [pendingApproval, setPendingApproval] = useState(false)
+
+  async function checkConflicts() {
+    try {
+      const res = await fetch(`/api/leaves?action=calculate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          startDate: leave.startDate, 
+          endDate: leave.endDate,
+          userId: leave.userId 
+        })
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        return data.warning
+      }
+    } catch (err) {
+      console.error('Failed to check conflicts:', err)
+    }
+    return null
+  }
+
+  async function handleApprove() {
+    const warning = await checkConflicts()
+    if (warning) {
+      setConflictWarning(warning)
+      setShowConflictDialog(true)
+    } else {
+      updateStatus('approved')
+    }
+  }
+
+  async function confirmApproval() {
+    setShowConflictDialog(false)
+    updateStatus('approved')
+  }
 
   async function updateStatus(status: 'approved' | 'rejected') {
     setUpdating(true)
@@ -819,7 +862,7 @@ function LeaveCard({ leave, isAdmin, onStatusUpdate, token, showToast, showError
       {isAdmin && leave.status === 'pending' && (
         <div style={{marginTop:'15px',display:'flex',gap:'10px'}}>
           <button 
-            onClick={() => updateStatus('approved')}
+            onClick={handleApprove}
             disabled={updating}
             style={{
               padding:'8px 16px',
@@ -850,6 +893,71 @@ function LeaveCard({ leave, isAdmin, onStatusUpdate, token, showToast, showError
           >
             ✗ Reject
           </button>
+        </div>
+      )}
+
+      {/* Conflict Warning Dialog */}
+      {showConflictDialog && (
+        <div style={{
+          position:'fixed',
+          top:0,
+          left:0,
+          right:0,
+          bottom:0,
+          background:'rgba(0,0,0,0.5)',
+          display:'flex',
+          alignItems:'center',
+          justifyContent:'center',
+          zIndex:1000
+        }}>
+          <div style={{
+            background:'white',
+            padding:'20px',
+            borderRadius:'10px',
+            maxWidth:'450px',
+            width:'90%',
+            boxShadow:'0 4px 20px rgba(0,0,0,0.3)'
+          }}>
+            <h3 style={{margin:'0 0 15px',color:'#dc2626'}}>⚠️ Concurrent Leave Limit Warning</h3>
+            <p style={{margin:'0 0 20px',color:'#4b5563',fontSize:'14px'}}>
+              {conflictWarning}
+            </p>
+            <p style={{margin:'0 0 20px',color:'#6b7280',fontSize:'13px'}}>
+              Do you want to approve this leave request anyway?
+            </p>
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
+              <button 
+                onClick={() => setShowConflictDialog(false)}
+                style={{
+                  padding:'8px 16px',
+                  background:'white',
+                  border:'1px solid #d1d5db',
+                  borderRadius:'5px',
+                  cursor:'pointer',
+                  fontSize:'14px',
+                  fontWeight:'500',
+                  color:'#374151'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmApproval}
+                style={{
+                  padding:'8px 16px',
+                  background:'#dc2626',
+                  color:'white',
+                  border:'none',
+                  borderRadius:'5px',
+                  cursor:'pointer',
+                  fontSize:'14px',
+                  fontWeight:'500'
+                }}
+              >
+                Approve Anyway
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
