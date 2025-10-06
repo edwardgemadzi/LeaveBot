@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard'
 import InteractiveCalendar from './components/InteractiveCalendar'
 import UserManagement from './components/UserManagement'
 import TeamManagement from './components/TeamManagement'
+import UserProfileModal from './components/UserProfileModal'
 import { ToastContainer } from './components/Toast'
 import { useToast } from './hooks/useToast'
 import { EmptyState } from './components/EmptyState'
@@ -31,6 +32,7 @@ function App() {
   const [availableTeams, setAvailableTeams] = useState<any[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
+  const [showProfileSettings, setShowProfileSettings] = useState(false)
   const [calculatedDays, setCalculatedDays] = useState<{
     workingDays: number
     calendarDays: number
@@ -401,9 +403,27 @@ function App() {
     <div style={{maxWidth:'1200px',margin:'0 auto',padding:'20px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
         <h1>LeaveBot - Welcome {user.name}!</h1>
-        <button onClick={handleLogout} style={{padding:'10px 20px',background:'#dc3545',color:'white',border:'none',cursor:'pointer',borderRadius:'5px'}}>
-          Logout
-        </button>
+        <div style={{display:'flex',gap:'10px'}}>
+          <button 
+            onClick={() => setShowProfileSettings(true)} 
+            style={{
+              padding:'10px 20px',
+              background:'#3b82f6',
+              color:'white',
+              border:'none',
+              cursor:'pointer',
+              borderRadius:'5px',
+              display:'flex',
+              alignItems:'center',
+              gap:'6px'
+            }}
+          >
+            ⚙️ My Settings
+          </button>
+          <button onClick={handleLogout} style={{padding:'10px 20px',background:'#dc3545',color:'white',border:'none',cursor:'pointer',borderRadius:'5px'}}>
+            Logout
+          </button>
+        </div>
       </div>
 
       {error && <div style={{padding:'10px',background:'#f8d7da',color:'#721c24',borderRadius:'5px',margin:'20px 0'}}>{error}</div>}
@@ -649,7 +669,7 @@ function App() {
                 <LeaveCard 
                   key={leave.id} 
                   leave={leave} 
-                  isAdmin={user.role === 'admin'}
+                  isAdmin={user.role === 'admin' || user.role === 'leader'}
                   onStatusUpdate={() => loadLeaves()}
                   token={token}
                   showToast={success}
@@ -659,6 +679,20 @@ function App() {
             </div>
           )}
         </div>
+      )}
+
+      {/* User Profile Settings Modal */}
+      {showProfileSettings && (
+        <UserProfileModal
+          isOpen={showProfileSettings}
+          onClose={() => setShowProfileSettings(false)}
+          user={user}
+          token={token}
+          onSuccess={() => {
+            success('Settings saved successfully!')
+            setShowProfileSettings(false)
+          }}
+        />
       )}
     </div>
     </>

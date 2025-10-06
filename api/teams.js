@@ -426,10 +426,20 @@ async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
     const db = client.db('leavebot');
     const teamsCollection = db.collection('teams');
     const usersCollection = db.collection('users');
+    const leavesCollection = db.collection('leaves');
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
       return res.status(404).json({ error: 'Team not found' });
+    }
+
+    // Get all users in this team
+    const teamUsers = await usersCollection.find({ teamId: new ObjectId(teamId) }).toArray();
+    const teamUserIds = teamUsers.map(u => u._id);
+
+    // Delete all leave requests for users in this team
+    if (teamUserIds.length > 0) {
+      await leavesCollection.deleteMany({ userId: { $in: teamUserIds } });
     }
 
     // Unassign all users from this team

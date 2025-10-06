@@ -280,10 +280,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
-    // Only admins can approve/reject leaves
-    if (auth.user.role !== 'admin') {
-      logger.warn('Non-admin attempted to update leave status', { userId: auth.user.id, role: auth.user.role });
-      return res.status(403).json({ error: 'Only admins can approve or reject leave requests' });
+    // Admins and leaders can approve/reject leaves
+    if (auth.user.role !== 'admin' && auth.user.role !== 'leader') {
+      logger.warn('Non-admin/leader attempted to update leave status', { userId: auth.user.id, role: auth.user.role });
+      return res.status(403).json({ error: 'Only admins and team leaders can approve or reject leave requests' });
     }
 
     // Extract leave ID from URL path

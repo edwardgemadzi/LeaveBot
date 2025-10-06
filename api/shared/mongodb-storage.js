@@ -201,11 +201,33 @@ export async function getAllLeaves(userId = null, role = 'user') {
   try {
     const { db } = await connectToDatabase();
     const leavesCollection = db.collection('leaves');
+    const usersCollection = db.collection('users');
+    const teamsCollection = db.collection('teams');
     
-    // Admin and leader can see all leaves, regular users only see their own
-    const query = (role === 'admin' || role === 'leader') ? {} : { userId };
+    // Admin sees all leaves
+    if (role === 'admin') {
+      return await leavesCollection.find({}).sort({ createdAt: -1 }).toArray();
+    }
     
-    return await leavesCollection.find(query).sort({ createdAt: -1 }).toArray();
+    // Leader sees only their team members' leaves
+    if (role === 'leader') {
+      // Find the team where this user is the leader
+      const team = await teamsCollection.findOne({ leaderId: new ObjectId(userId) });
+      if (!team) {
+        // Leader has no team, return empty
+        return [];
+      }
+      
+      // Get all users in the leader's team
+      const teamMembers = await usersCollection.find({ teamId: team._id }).toArray();
+      const teamMemberIds = teamMembers.map(m => m._id.toString());
+      
+      // Return leaves for team members only
+      return await leavesCollection.find({ userId: { $in: teamMemberIds } }).sort({ createdAt: -1 }).toArray();
+    }
+    
+    // Regular users only see their own leaves
+    return await leavesCollection.find({ userId }).sort({ createdAt: -1 }).toArray();
   } catch (error) {
     logger.error('Error getting leaves:', error);
     return [];
