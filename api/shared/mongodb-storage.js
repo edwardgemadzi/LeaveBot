@@ -27,6 +27,8 @@ async function connectToDatabase() {
   // Create indexes
   await db.collection('users').createIndex({ username: 1 }, { unique: true });
   await db.collection('leaves').createIndex({ userId: 1 });
+  await db.collection('teams').createIndex({ name: 1 }, { unique: true });
+  await db.collection('teams').createIndex({ leaderId: 1 });
   
   cachedClient = client;
   cachedDb = db;
@@ -244,6 +246,136 @@ export async function updateLeaveStatus(leaveId, status) {
   } catch (error) {
     console.error('Error updating leave status:', error);
     return false;
+  }
+}
+
+// Team management functions
+
+// Get all teams
+export async function getAllTeams() {
+  try {
+    const { db } = await connectToDatabase();
+    return await db.collection('teams').find({}).toArray();
+  } catch (error) {
+    console.error('Error getting teams:', error);
+    return [];
+  }
+}
+
+// Get team by ID
+export async function getTeamById(teamId) {
+  try {
+    const { db } = await connectToDatabase();
+    return await db.collection('teams').findOne({ _id: teamId });
+  } catch (error) {
+    console.error('Error getting team:', error);
+    return null;
+  }
+}
+
+// Create team
+export async function createTeam(teamData) {
+  try {
+    const { db } = await connectToDatabase();
+    const teamsCollection = db.collection('teams');
+    
+    const newTeam = {
+      ...teamData,
+      createdAt: new Date(),
+      memberCount: 0
+    };
+    
+    const result = await teamsCollection.insertOne(newTeam);
+    return { _id: result.insertedId, ...newTeam };
+  } catch (error) {
+    console.error('Error creating team:', error);
+    throw error;
+  }
+}
+
+// Update team
+export async function updateTeam(teamId, updates) {
+  try {
+    const { db } = await connectToDatabase();
+    const teamsCollection = db.collection('teams');
+    
+    const result = await teamsCollection.updateOne(
+      { _id: teamId },
+      { $set: { ...updates, updatedAt: new Date() } }
+    );
+    
+    return result.modifiedCount > 0;
+  } catch (error) {
+    console.error('Error updating team:', error);
+    return false;
+  }
+}
+
+// Delete team
+export async function deleteTeam(teamId) {
+  try {
+    const { db } = await connectToDatabase();
+    const teamsCollection = db.collection('teams');
+    const usersCollection = db.collection('users');
+    
+    // Remove teamId from all users in this team
+    await usersCollection.updateMany(
+      { teamId },
+      { $unset: { teamId: '' } }
+    );
+    
+    const result = await teamsCollection.deleteOne({ _id: teamId });
+    return result.deletedCount > 0;
+  } catch (error) {
+    console.error('Error deleting team:', error);
+    return false;
+  }
+}
+
+// Assign user to team
+export async function assignUserToTeam(userId, teamId) {
+  try {
+    const { db } = await connectToDatabase();
+    const usersCollection = db.collection('users');
+    
+    const result = await usersCollection.updateOne(
+      { _id: userId },
+      { $set: { teamId, updatedAt: new Date() } }
+    );
+    
+    return result.modifiedCount > 0;
+  } catch (error) {
+    console.error('Error assigning user to team:', error);
+    return false;
+  }
+}
+
+// Remove user from team
+export async function removeUserFromTeam(userId) {
+  try {
+    const { db } = await connectToDatabase();
+    const usersCollection = db.collection('users');
+    
+    const result = await usersCollection.updateOne(
+      { _id: userId },
+      { $unset: { teamId: '' }, $set: { updatedAt: new Date() } }
+    );
+    
+    return result.modifiedCount > 0;
+  } catch (error) {
+    console.error('Error removing user from team:', error);
+    return false;
+  }
+}
+
+// Get users by team
+export async function getUsersByTeam(teamId) {
+  try {
+    const { db } = await connectToDatabase();
+    return await db.collection('users').find({ teamId }).toArray();
+  } catch (error) {
+    console.error('Error getting users by team:', error);
+    return [];
   }
 }
 

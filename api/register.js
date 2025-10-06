@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { username, password, name } = req.body;
+  const { username, password, name, teamId } = req.body;
   
   // Validate input
   const validation = validateUserInput({ username, password, name });
@@ -70,11 +70,19 @@ export default async function handler(req, res) {
   const passwordHash = await bcrypt.hash(validPassword, 10);
   
   // Create user using helper (will auto-assign admin if first user)
-  const newUser = await addUser({
+  const userData = {
     username: validUsername,
     passwordHash,
     name: validName
-  });
+  };
+  
+  // Add teamId if provided
+  if (teamId) {
+    const { ObjectId } = await import('mongodb');
+    userData.teamId = new ObjectId(teamId);
+  }
+  
+  const newUser = await addUser(userData);
   
   // Generate JWT token
   const token = jwt.sign(
