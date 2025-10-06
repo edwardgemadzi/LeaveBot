@@ -1,13 +1,13 @@
-const { MongoClient, ObjectId } = require('mongodb');
-const jwt = require('jsonwebtoken');
-const { rateLimiter } = require('./shared/rate-limiter');
-const { logger } = require('./shared/logger');
-const { validateObjectId, validateTeamName, sanitizeString } = require('./shared/validators');
-const { 
+import { MongoClient, ObjectId } from 'mongodb';
+import jwt from 'jsonwebtoken';
+import { rateLimiters } from './shared/rate-limiter.js';
+import { logger } from './shared/logger.js';
+import { validateObjectId, validateTeamName, sanitizeString } from './shared/validators.js';
+import { 
   getDefaultTeamSettings, 
   validateShiftPattern, 
   validateConcurrentLeave 
-} = require('./shared/working-days');
+} from './shared/working-days.js';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -22,7 +22,7 @@ async function connectToDatabase() {
   return client;
 }
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   const startTime = Date.now();
   
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -97,10 +97,10 @@ module.exports = async (req, res) => {
 
 // GET /api/teams - List all teams
 async function handleListTeams(req, res, decoded, startTime) {
-  const rateLimitResult = rateLimiter.read(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.read(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for list teams', { userId: decoded.id });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   try {
@@ -149,10 +149,10 @@ async function handleListTeams(req, res, decoded, startTime) {
 
 // GET /api/teams?id={teamId} - Get team details with members
 async function handleGetTeamDetails(req, res, decoded, startTime, teamId) {
-  const rateLimitResult = rateLimiter.read(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.read(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for get team details', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
@@ -209,10 +209,10 @@ async function handleGetTeamDetails(req, res, decoded, startTime, teamId) {
 
 // POST /api/teams - Create new team
 async function handleCreateTeam(req, res, decoded, startTime) {
-  const rateLimitResult = rateLimiter.mutation(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.mutation(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for create team', { userId: decoded.id });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   // Only admins can create teams
@@ -300,10 +300,10 @@ async function handleCreateTeam(req, res, decoded, startTime) {
 
 // PUT /api/teams?id={teamId} - Update team
 async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
-  const rateLimitResult = rateLimiter.mutation(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.mutation(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for update team', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   // Only admins can update teams
@@ -404,10 +404,10 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
 
 // DELETE /api/teams?id={teamId} - Delete team
 async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
-  const rateLimitResult = rateLimiter.mutation(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.mutation(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for delete team', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   // Only admins can delete teams
@@ -459,10 +459,10 @@ async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
 
 // POST /api/teams?id={teamId}&action=assign - Assign user to team
 async function handleAssignUser(req, res, decoded, startTime, teamId) {
-  const rateLimitResult = rateLimiter.mutation(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.mutation(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for assign user', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
@@ -529,10 +529,10 @@ async function handleAssignUser(req, res, decoded, startTime, teamId) {
 
 // POST /api/teams?id={teamId}&action=remove - Remove user from team
 async function handleRemoveUser(req, res, decoded, startTime, teamId) {
-  const rateLimitResult = rateLimiter.mutation(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.mutation(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for remove user', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
@@ -599,10 +599,10 @@ async function handleRemoveUser(req, res, decoded, startTime, teamId) {
 
 // GET /api/teams?id={teamId}&action=settings - Get team settings
 async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
-  const rateLimitResult = rateLimiter.read(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.read(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for get team settings', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
@@ -650,10 +650,10 @@ async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
 
 // PUT /api/teams?id={teamId}&action=settings - Update team settings
 async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
-  const rateLimitResult = rateLimiter.mutation(req);
-  if (rateLimitResult.blocked) {
+  const rateLimitResult = rateLimiters.mutation(req);
+  if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for update team settings', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.error });
+    return res.status(429).json({ error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
