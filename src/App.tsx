@@ -3,8 +3,9 @@ import './App.css'
 import Dashboard from './components/Dashboard'
 import LeaveCalendar from './components/LeaveCalendar'
 import UserManagement from './components/UserManagement'
+import TeamManagement from './components/TeamManagement'
 
-type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team'
+type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams'
 
 function App() {
   const [user, setUser] = useState<any>(null)
@@ -21,6 +22,8 @@ function App() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [currentView, setCurrentView] = useState<View>('dashboard')
+  const [availableTeams, setAvailableTeams] = useState<any[]>([])
+  const [selectedTeamId, setSelectedTeamId] = useState('')
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -32,6 +35,25 @@ function App() {
       loadLeaves(savedToken)
     }
   }, [])
+
+  // Load teams when registration mode is active
+  useEffect(() => {
+    if (isRegistering) {
+      loadTeams()
+    }
+  }, [isRegistering])
+
+  async function loadTeams() {
+    try {
+      const res = await fetch('/api/teams')
+      if (res.ok) {
+        const data = await res.json()
+        setAvailableTeams(data.teams || [])
+      }
+    } catch (err) {
+      console.error('Failed to load teams:', err)
+    }
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -72,7 +94,12 @@ function App() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, name })
+        body: JSON.stringify({ 
+          username, 
+          password, 
+          name,
+          teamId: selectedTeamId || undefined
+        })
       })
       const data = await res.json()
       
@@ -83,6 +110,7 @@ function App() {
         localStorage.setItem('token', data.token)
         setPassword('') // Clear password from memory
         setName('')
+        setSelectedTeamId('')
         loadLeaves(data.token)
         if (data.message) {
           alert(data.message)
@@ -198,6 +226,22 @@ function App() {
               disabled={loading}
             />
           )}
+
+          {isRegistering && (
+            <select
+              value={selectedTeamId}
+              onChange={e => setSelectedTeamId(e.target.value)}
+              style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+              disabled={loading}
+            >
+              <option value="">No team (join later)</option>
+              {availableTeams.map((team: any) => (
+                <option key={team._id} value={team._id}>
+                  {team.name} {team.leaderName ? `- ${team.leaderName}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
           
           <input 
             type="password" 
@@ -220,7 +264,7 @@ function App() {
         </form>
         
         <button 
-          onClick={()=>{setIsRegistering(!isRegistering);setError('');setPassword('');setName('');}}
+          onClick={()=>{setIsRegistering(!isRegistering);setError('');setPassword('');setName('');setSelectedTeamId('');}}
           style={{width:'100%',padding:'10px',background:'transparent',color:'#007bff',border:'1px solid #007bff',cursor:'pointer'}}
           disabled={loading}
         >
@@ -282,12 +326,20 @@ function App() {
           icon="✏️"
           label="Request Leave"
         />
+        {user.role === 'admin' && (
+          <NavTab 
+            active={currentView === 'teams'} 
+            onClick={() => setCurrentView('teams')}
+            icon="🏢"
+            label="Teams"
+          />
+        )}
         {(user.role === 'admin' || user.role === 'leader') && (
           <NavTab 
             active={currentView === 'team'} 
             onClick={() => setCurrentView('team')}
             icon="👥"
-            label="Team Management"
+            label="Users"
           />
         )}
       </div>
@@ -299,6 +351,10 @@ function App() {
 
       {currentView === 'calendar' && (
         <LeaveCalendar user={user} leaves={leaves} />
+      )}
+
+      {currentView === 'teams' && user.role === 'admin' && (
+        <TeamManagement currentUser={user} token={token} />
       )}
 
       {currentView === 'team' && (user.role === 'admin' || user.role === 'leader') && (
