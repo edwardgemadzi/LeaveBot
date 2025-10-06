@@ -16,6 +16,7 @@
 - Working days calculation: only count actual work days
 - Concurrent leave limits: control how many people can be off simultaneously
 - Per-team settings for shift times (day/night/custom)
+- **Annual leave days per team**: Customizable from 1-365 days/year
 
 ### 3. Backend Implementation
 - **Status**: Complete - Ready for Testing
@@ -53,6 +54,13 @@
     ```
 
 - **Auto-initialization**: New teams created with default settings
+
+#### Balance Integration (`api/balance.js`)
+- **GET `/api/balance`** now reads `annualLeaveDays` from team settings
+- Each team can have different annual leave allowances
+- Automatically syncs: if team settings change, balance updates
+- Default: 21 days/year for users without teams
+- Validation: 1-365 days per year
 
 ### 4. Default Settings
 Every new team gets:
@@ -120,18 +128,25 @@ Every new team gets:
 
 ## 📊 Example Calculations
 
-### Scenario: 2/2 Shift Pattern
+### Scenario 1: 2/2 Shift Pattern
 - User requests leave: Oct 1 - Oct 10 (10 calendar days)
 - Pattern started: Oct 1 (work), Oct 2 (work), Oct 3 (off), Oct 4 (off), Oct 5 (work)...
 - **Result**: 5 working days, 5 off days
 - **Leave deduction**: Only 5 days from balance
 
-### Scenario: Regular Mon-Fri
+### Scenario 2: Regular Mon-Fri
 - User requests leave: Oct 1 (Wed) - Oct 10 (Fri) (10 calendar days)
 - Includes: Oct 1-3, Oct 6-10 (7 work days)
 - Excludes: Oct 4-5 (Sat-Sun), Oct 11-12 (Sat-Sun)
 - **Result**: 7 working days
 - **Leave deduction**: 7 days from balance
+
+### Scenario 3: Different Annual Leave Allowances
+- **Team A (Office)**: 21 days/year - User has 21 days available
+- **Team B (Manufacturing)**: 15 days/year - User has 15 days available
+- **Team C (Management)**: 30 days/year - User has 30 days available
+- Each team's balance automatically reflects their configured `annualLeaveDays`
+- When team settings change, existing balances sync on next fetch
 
 ## 🔒 Security & Validation
 

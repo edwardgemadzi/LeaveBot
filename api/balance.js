@@ -62,6 +62,17 @@ export default async function handler(req, res) {
     }
 
     try {
+      // Get user's team to determine annual leave days
+      const user = await db.collection('users').findOne({ _id: userIdValidation.value });
+      let annualLeaveDays = 21; // System default
+      
+      if (user?.teamId) {
+        const team = await db.collection('teams').findOne({ _id: user.teamId });
+        if (team?.settings?.annualLeaveDays) {
+          annualLeaveDays = team.settings.annualLeaveDays;
+        }
+      }
+      
       const balance = await db.collection('balances').findOne({
         userId: userIdValidation.value,
         year: yearNum
@@ -72,19 +83,28 @@ export default async function handler(req, res) {
         const defaultBalance = {
           userId: userIdValidation.value,
           year: yearNum,
-          totalDays: 20, // Default 20 days per year
+          totalDays: annualLeaveDays,
           usedDays: 0,
           pendingDays: 0,
-          availableDays: 20
+          availableDays: annualLeaveDays
         };
         
         const duration = Date.now() - startTime;
-        logger.response(req, res, duration, { userId: userIdValidation.value, year: yearNum, isDefault: true });
+        logger.response(req, res, duration, { userId: userIdValidation.value, year: yearNum, isDefault: true, annualLeaveDays });
         
         return res.json({
           success: true,
           balance: defaultBalance
         });
+      }
+      
+      // Update totalDays from team settings if it has changed
+      if (balance.totalDays !== annualLeaveDays) {
+        balance.totalDays = annualLeaveDays;
+        await db.collection('balances').updateOne(
+          { _id: balance._id },
+          { $set: { totalDays: annualLeaveDays } }
+        );
       }
 
       // Calculate available days
