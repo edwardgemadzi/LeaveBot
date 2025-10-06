@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import Dashboard from './components/Dashboard'
+import LeaveCalendar from './components/LeaveCalendar'
+
+type View = 'dashboard' | 'calendar' | 'list' | 'form'
 
 function App() {
   const [user, setUser] = useState<any>(null)
@@ -15,6 +19,7 @@ function App() {
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [currentView, setCurrentView] = useState<View>('dashboard')
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -234,80 +239,271 @@ function App() {
   }
 
   return (
-    <div style={{maxWidth:'800px',margin:'0 auto',padding:'20px'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+    <div style={{maxWidth:'1200px',margin:'0 auto',padding:'20px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
         <h1>LeaveBot - Welcome {user.name}!</h1>
-        <button onClick={handleLogout} style={{padding:'10px 20px',background:'#dc3545',color:'white',border:'none',cursor:'pointer'}}>
+        <button onClick={handleLogout} style={{padding:'10px 20px',background:'#dc3545',color:'white',border:'none',cursor:'pointer',borderRadius:'5px'}}>
           Logout
         </button>
       </div>
 
       {error && <div style={{padding:'10px',background:'#f8d7da',color:'#721c24',borderRadius:'5px',margin:'20px 0'}}>{error}</div>}
 
-      <div style={{marginTop:'30px'}}>
-        <h2>Request Leave</h2>
-        <form onSubmit={handleSubmitLeave} style={{border:'1px solid #ddd',padding:'20px',borderRadius:'5px'}}>
-          <input 
-            type="text" 
-            placeholder="Employee Name" 
-            value={employeeName}
-            onChange={e=>setEmployeeName(e.target.value)}
-            style={{width:'100%',padding:'10px',margin:'10px 0'}}
-            required
-            disabled={loading}
-          />
-          <input 
-            type="date" 
-            placeholder="Start Date" 
-            value={startDate}
-            onChange={e=>setStartDate(e.target.value)}
-            style={{width:'100%',padding:'10px',margin:'10px 0'}}
-            required
-            disabled={loading}
-          />
-          <input 
-            type="date" 
-            placeholder="End Date" 
-            value={endDate}
-            onChange={e=>setEndDate(e.target.value)}
-            style={{width:'100%',padding:'10px',margin:'10px 0'}}
-            required
-            disabled={loading}
-          />
-          <textarea 
-            placeholder="Reason (optional)" 
-            value={reason}
-            onChange={e=>setReason(e.target.value)}
-            style={{width:'100%',padding:'10px',margin:'10px 0',minHeight:'80px'}}
-            disabled={loading}
-          />
-          <button 
-            type="submit" 
-            style={{padding:'10px 20px',background:loading?'#6c757d':'#28a745',color:'white',border:'none',cursor:loading?'not-allowed':'pointer'}}
-            disabled={loading}
-          >
-            {loading ? 'Submitting...' : 'Submit Request'}
-          </button>
-        </form>
+      {/* Navigation Tabs */}
+      <div style={{
+        display:'flex',
+        gap:'10px',
+        marginBottom:'30px',
+        borderBottom:'2px solid #e5e7eb',
+        paddingBottom:'0'
+      }}>
+        <NavTab 
+          active={currentView === 'dashboard'} 
+          onClick={() => setCurrentView('dashboard')}
+          icon="📊"
+          label="Dashboard"
+        />
+        <NavTab 
+          active={currentView === 'calendar'} 
+          onClick={() => setCurrentView('calendar')}
+          icon="📅"
+          label="Calendar"
+        />
+        <NavTab 
+          active={currentView === 'list'} 
+          onClick={() => setCurrentView('list')}
+          icon="📋"
+          label="Leave List"
+        />
+        <NavTab 
+          active={currentView === 'form'} 
+          onClick={() => setCurrentView('form')}
+          icon="✏️"
+          label="Request Leave"
+        />
       </div>
 
-      <div style={{marginTop:'30px'}}>
-        <h2>Leave Requests</h2>
-        {leaves.length === 0 ? (
-          <p>No leave requests yet</p>
-        ) : (
-          <div>
-            {leaves.map(leave => (
-              <div key={leave.id} style={{border:'1px solid #ddd',padding:'15px',margin:'10px 0',borderRadius:'5px'}}>
-                <strong>{leave.employeeName}</strong>
-                <p>{leave.startDate} to {leave.endDate}</p>
-                {leave.reason && <p>Reason: {leave.reason}</p>}
-                <span style={{color:leave.status==='pending'?'orange':'green'}}>{leave.status}</span>
-              </div>
-            ))}
+      {/* View Content */}
+      {currentView === 'dashboard' && (
+        <Dashboard user={user} leaves={leaves} />
+      )}
+
+      {currentView === 'calendar' && (
+        <LeaveCalendar user={user} leaves={leaves} />
+      )}
+
+      {currentView === 'form' && (
+        <div style={{marginTop:'30px'}}>
+          <h2>Request Leave</h2>
+          <form onSubmit={handleSubmitLeave} style={{border:'1px solid #ddd',padding:'20px',borderRadius:'5px',background:'white'}}>
+            <input 
+              type="text" 
+              placeholder="Employee Name" 
+              value={employeeName}
+              onChange={e=>setEmployeeName(e.target.value)}
+              style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+              required
+              disabled={loading}
+            />
+            <input 
+              type="date" 
+              placeholder="Start Date" 
+              value={startDate}
+              onChange={e=>setStartDate(e.target.value)}
+              style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+              required
+              disabled={loading}
+            />
+            <input 
+              type="date" 
+              placeholder="End Date" 
+              value={endDate}
+              onChange={e=>setEndDate(e.target.value)}
+              style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+              required
+              disabled={loading}
+            />
+            <textarea 
+              placeholder="Reason (optional)" 
+              value={reason}
+              onChange={e=>setReason(e.target.value)}
+              style={{width:'100%',padding:'10px',margin:'10px 0',minHeight:'80px',borderRadius:'5px',border:'1px solid #ddd'}}
+              disabled={loading}
+            />
+            <button 
+              type="submit" 
+              style={{padding:'10px 20px',background:loading?'#6c757d':'#28a745',color:'white',border:'none',cursor:loading?'not-allowed':'pointer',borderRadius:'5px'}}
+              disabled={loading}
+            >
+              {loading ? 'Submitting...' : 'Submit Request'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {currentView === 'list' && (
+        <div style={{marginTop:'30px'}}>
+          <h2>Leave Requests</h2>
+          {leaves.length === 0 ? (
+            <p style={{textAlign:'center',color:'#9ca3af',padding:'40px'}}>No leave requests yet</p>
+          ) : (
+            <div>
+              {leaves.map(leave => (
+                <LeaveCard 
+                  key={leave.id} 
+                  leave={leave} 
+                  isAdmin={user.role === 'admin'}
+                  onStatusUpdate={() => loadLeaves()}
+                  token={token}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Navigation Tab Component
+function NavTab({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '12px 20px',
+        background: 'transparent',
+        border: 'none',
+        borderBottom: active ? '3px solid #3b82f6' : '3px solid transparent',
+        color: active ? '#3b82f6' : '#6b7280',
+        cursor: 'pointer',
+        fontSize: '15px',
+        fontWeight: active ? '600' : '500',
+        transition: 'all 0.2s',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </button>
+  )
+}
+
+// Leave Card Component with Admin Actions
+function LeaveCard({ leave, isAdmin, onStatusUpdate, token }: { 
+  leave: any; 
+  isAdmin: boolean; 
+  onStatusUpdate: () => void;
+  token: string;
+}) {
+  const [updating, setUpdating] = useState(false)
+
+  async function updateStatus(status: 'approved' | 'rejected') {
+    setUpdating(true)
+    try {
+      const res = await fetch(`/api/leaves/${leave._id || leave.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      })
+      
+      if (res.ok) {
+        alert(`Leave request ${status}!`)
+        onStatusUpdate()
+      } else {
+        alert('Failed to update leave request')
+      }
+    } catch (err) {
+      alert('Network error. Please try again.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const statusColors = {
+    pending: { bg: '#fef3c7', text: '#92400e' },
+    approved: { bg: '#d1fae5', text: '#065f46' },
+    rejected: { bg: '#fee2e2', text: '#991b1b' }
+  }
+
+  const color = statusColors[leave.status as keyof typeof statusColors] || statusColors.pending
+
+  return (
+    <div style={{
+      border:'1px solid #e5e7eb',
+      padding:'20px',
+      margin:'10px 0',
+      borderRadius:'8px',
+      background:'white',
+      boxShadow:'0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:'10px'}}>
+        <div>
+          <strong style={{fontSize:'18px',color:'#1f2937'}}>{leave.employeeName}</strong>
+          <div style={{display:'flex',gap:'10px',marginTop:'8px',fontSize:'14px',color:'#6b7280'}}>
+            <span>📅 {new Date(leave.startDate).toLocaleDateString()} - {new Date(leave.endDate).toLocaleDateString()}</span>
           </div>
-        )}
+        </div>
+        <span style={{
+          padding:'6px 12px',
+          borderRadius:'20px',
+          fontSize:'12px',
+          fontWeight:'600',
+          background: color.bg,
+          color: color.text,
+          textTransform:'uppercase'
+        }}>
+          {leave.status}
+        </span>
       </div>
+      
+      {leave.reason && (
+        <p style={{color:'#4b5563',marginTop:'10px',fontSize:'14px'}}>
+          <strong>Reason:</strong> {leave.reason}
+        </p>
+      )}
+
+      {isAdmin && leave.status === 'pending' && (
+        <div style={{marginTop:'15px',display:'flex',gap:'10px'}}>
+          <button 
+            onClick={() => updateStatus('approved')}
+            disabled={updating}
+            style={{
+              padding:'8px 16px',
+              background:updating?'#9ca3af':'#10b981',
+              color:'white',
+              border:'none',
+              borderRadius:'5px',
+              cursor:updating?'not-allowed':'pointer',
+              fontSize:'14px',
+              fontWeight:'500'
+            }}
+          >
+            ✓ Approve
+          </button>
+          <button 
+            onClick={() => updateStatus('rejected')}
+            disabled={updating}
+            style={{
+              padding:'8px 16px',
+              background:updating?'#9ca3af':'#ef4444',
+              color:'white',
+              border:'none',
+              borderRadius:'5px',
+              cursor:updating?'not-allowed':'pointer',
+              fontSize:'14px',
+              fontWeight:'500'
+            }}
+          >
+            ✗ Reject
+          </button>
+        </div>
+      )}
     </div>
   )
 }
