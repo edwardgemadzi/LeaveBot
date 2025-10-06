@@ -4,8 +4,6 @@ import {
   getTeamById,
   updateTeam,
   deleteTeam,
-  assignUserToTeam,
-  removeUserFromTeam,
   getUsersByTeam
 } from '../shared/mongodb-storage.js';
 import { ObjectId } from 'mongodb';
@@ -126,60 +124,6 @@ export default async function handler(req, res) {
     } catch (error) {
       console.error('Error deleting team:', error);
       return res.status(500).json({ success: false, error: 'Failed to delete team' });
-    }
-  }
-
-  // POST /api/teams/:id/assign - Assign user to team (admin only)
-  if (req.method === 'POST' && req.url.includes('/assign')) {
-    const auth = authenticateAndAuthorize(req, ['admin']);
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error });
-    }
-
-    try {
-      const { userId } = req.body;
-
-      if (!userId) {
-        return res.status(400).json({ success: false, error: 'User ID is required' });
-      }
-
-      const success = await assignUserToTeam(new ObjectId(userId), new ObjectId(id));
-      
-      if (success) {
-        return res.status(200).json({ success: true, message: 'User assigned to team successfully' });
-      } else {
-        return res.status(500).json({ success: false, error: 'Failed to assign user to team' });
-      }
-    } catch (error) {
-      console.error('Error assigning user to team:', error);
-      return res.status(500).json({ success: false, error: 'Failed to assign user to team' });
-    }
-  }
-
-  // POST /api/teams/:id/remove - Remove user from team (admin only)
-  if (req.method === 'POST' && req.url.includes('/remove')) {
-    const auth = authenticateAndAuthorize(req, ['admin']);
-    if (auth.error) {
-      return res.status(auth.status).json({ success: false, error: auth.error });
-    }
-
-    try {
-      const { userId } = req.body;
-
-      if (!userId) {
-        return res.status(400).json({ success: false, error: 'User ID is required' });
-      }
-
-      const success = await removeUserFromTeam(new ObjectId(userId));
-      
-      if (success) {
-        return res.status(200).json({ success: true, message: 'User removed from team successfully' });
-      } else {
-        return res.status(500).json({ success: false, error: 'Failed to remove user from team' });
-      }
-    } catch (error) {
-      console.error('Error removing user from team:', error);
-      return res.status(500).json({ success: false, error: 'Failed to remove user from team' });
     }
   }
 
