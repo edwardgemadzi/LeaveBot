@@ -2,6 +2,9 @@ import jwt from 'jsonwebtoken';
 import { JWT_SECRET, getAllLeaves, addLeaveRequest } from './shared/mongodb-storage.js';
 import { rateLimiters } from './shared/rate-limiter.js';
 import { logger } from './shared/logger.js';
+import { calculateWorkingDays, getDefaultTeamSettings } from './shared/working-days.js';
+import { ObjectId } from 'mongodb';
+import { connectToDatabase } from './shared/mongodb-storage.js';
 
 // Authentication middleware
 function authenticateToken(req) {
@@ -79,6 +82,120 @@ export default async function handler(req, res) {
   const auth = authenticateToken(req);
   if (!auth.authenticated) {
     return res.status(401).json({ error: auth.error });
+  }
+
+  // Handle calculate action (POST /api/leaves?action=calculate)
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const action = url.searchParams.get('action');
+  
+  if (req.method === 'POST' && action === 'calculate') {
+    const { startDate, endDate, userId } = req.body;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' });
+    }
+
+    // Validate dates
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+
+    if (end < start) {
+      return res.status(400).json({ error: 'End date must be after start date' });
+    }
+
+    try {
+      const { db } = await connectToDatabase();
+      const usersCollection = db.collection('users');
+      const teamsCollection = db.collection('teams');
+      const leavesCollection = db.collection('leaves');
+
+      // Get user's team and settings
+      const targetUserId = userId || auth.user.id;
+      const user = await usersCollection.findOne({ _id: new ObjectId(targetUserId) });
+      
+      let teamSettings = getDefaultTeamSettings();
+      if (user?.teamId) {
+        const team = await teamsCollection.findOne({ _id: user.teamId });
+        if (team?.settings) {
+          teamSettings = team.settings;
+        }
+      }
+
+      // Calculate working days based on team settings
+      const result = calculateWorkingDays(
+        start,
+        end,
+        teamSettings.shiftPattern,
+        teamSettings.workingDays
+      );
+
+      // Check concurrent leave limits if enabled
+      let concurrentWarning = null;
+      let concurrentCount = 0;
+      
+      if (teamSettings.concurrentLeave?.enabled && user?.teamId) {
+        // Find overlapping leaves
+        const overlappingLeaves = await leavesCollection.find({
+          status: 'approved',
+          $or: [
+            { startDate: { $lte: endDate }, endDate: { $gte: startDate } }
+          ]
+        }).toArray();
+
+        // Filter by team
+        const teamMembers = await usersCollection.find({ teamId: user.teamId }).toArray();
+        const teamMemberIds = teamMembers.map(m => m._id.toString());
+        
+        const overlappingTeamLeaves = overlappingLeaves.filter(leave => 
+          teamMemberIds.includes(leave.userId.toString())
+        );
+
+        concurrentCount = overlappingTeamLeaves.length;
+        const limit = teamSettings.concurrentLeave.checkByShift 
+          ? teamSettings.concurrentLeave.maxPerShift
+          : teamSettings.concurrentLeave.maxPerTeam;
+
+        if (concurrentCount >= limit) {
+          concurrentWarning = `${concurrentCount}/${limit} team members already on leave during this period. Limit reached.`;
+        } else if (concurrentCount >= limit - 1) {
+          concurrentWarning = `${concurrentCount}/${limit} team members on leave. Adding this request will reach the limit.`;
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info('Working days calculated', {
+        userId: targetUserId,
+        workingDays: result.count,
+        calendarDays: result.calendarDays,
+        duration
+      });
+
+      return res.status(200).json({
+        workingDays: result.count,
+        calendarDays: result.calendarDays,
+        affectedDates: result.dates,
+        shiftPattern: teamSettings.shiftPattern.type,
+        shiftTime: teamSettings.shiftTime.type,
+        warning: concurrentWarning,
+        concurrentInfo: {
+          count: concurrentCount,
+          limit: teamSettings.concurrentLeave?.maxPerTeam || 0,
+          enabled: teamSettings.concurrentLeave?.enabled || false
+        }
+      });
+    } catch (err) {
+      const duration = Date.now() - startTime;
+      logger.error('Error calculating working days', { 
+        error: err.message, 
+        userId: auth.user.id,
+        duration 
+      });
+      return res.status(500).json({ error: 'Failed to calculate working days' });
+    }
   }
 
   if (req.method === 'GET') {

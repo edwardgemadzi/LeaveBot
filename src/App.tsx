@@ -89,7 +89,7 @@ function App() {
     const calculateDays = async () => {
       setCalculatingDays(true)
       try {
-        const res = await fetch('/api/leaves/calculate', {
+        const res = await fetch('/api/leaves?action=calculate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
