@@ -80,11 +80,14 @@ function App() {
     setError('')
     setLoading(true)
     
+    // Strip @ symbol if user included it
+    const cleanUsername = username.replace(/^@+/, '')
+    
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username: cleanUsername, password })
       })
       const data = await res.json()
       
@@ -111,12 +114,15 @@ function App() {
     setError('')
     setLoading(true)
     
+    // Strip @ symbol if user included it
+    const cleanUsername = username.replace(/^@+/, '')
+    
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          username, 
+          username: cleanUsername, 
           password, 
           name,
           teamId: selectedTeamId || undefined
@@ -232,7 +238,7 @@ function App() {
         <form onSubmit={isRegistering ? handleRegister : handleLogin}>
           <input 
             type="text" 
-            placeholder="Username" 
+            placeholder="Username (without @)" 
             value={username}
             onChange={e=>setUsername(e.target.value)}
             style={{width:'100%',padding:'10px',margin:'10px 0'}}
