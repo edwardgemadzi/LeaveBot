@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import './App.css'
 import Dashboard from './components/Dashboard'
-import LeaveCalendar from './components/LeaveCalendar'
+import InteractiveCalendar from './components/InteractiveCalendar'
 import UserManagement from './components/UserManagement'
 import TeamManagement from './components/TeamManagement'
 import { ToastContainer } from './components/Toast'
@@ -379,7 +379,16 @@ function App() {
       )}
 
       {currentView === 'calendar' && (
-        <LeaveCalendar user={user} leaves={leaves} />
+        <InteractiveCalendar 
+          user={user} 
+          leaves={leaves}
+          onRequestLeave={(startDate, endDate) => {
+            setStartDate(startDate.toISOString().split('T')[0])
+            setEndDate(endDate.toISOString().split('T')[0])
+            setEmployeeName(user.name)
+            setCurrentView('form')
+          }}
+        />
       )}
 
       {currentView === 'teams' && user.role === 'admin' && (
