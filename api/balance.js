@@ -1,8 +1,9 @@
-import clientPromise from '../../lib/mongodb';
-import { verifyToken } from '../../lib/auth';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET, connectToDatabase } from './shared/mongodb-storage.js';
 import { rateLimiters } from './shared/rate-limiter.js';
 import { logger } from './shared/logger.js';
 import { validateObjectId, validateBalance } from './shared/validators.js';
+import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
   const startTime = Date.now();
@@ -34,13 +35,15 @@ export default async function handler(req, res) {
   }
 
   const token = authHeader.split(' ')[1];
-  const decoded = verifyToken(token);
-  if (!decoded) {
+  let decoded;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    logger.warn('Invalid JWT token', { error: err.message });
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const client = await clientPromise;
-  const db = client.db('leavebot');
+  const { db } = await connectToDatabase();
 
   if (req.method === 'GET') {
     // Get balance for a specific user and year
@@ -63,7 +66,7 @@ export default async function handler(req, res) {
 
     try {
       // Get user's team to determine annual leave days
-      const user = await db.collection('users').findOne({ _id: userIdValidation.value });
+      const user = await db.collection('users').findOne({ _id: new ObjectId(userIdValidation.value) });
       let annualLeaveDays = 21; // System default
       
       if (user?.teamId) {
@@ -74,14 +77,14 @@ export default async function handler(req, res) {
       }
       
       const balance = await db.collection('balances').findOne({
-        userId: userIdValidation.value,
+        userId: new ObjectId(userIdValidation.value),
         year: yearNum
       });
 
       if (!balance) {
         // Return default balance if none exists
         const defaultBalance = {
-          userId: userIdValidation.value,
+          userId: new ObjectId(userIdValidation.value),
           year: yearNum,
           totalDays: annualLeaveDays,
           usedDays: 0,
@@ -164,7 +167,7 @@ export default async function handler(req, res) {
 
     try {
       const balanceData = {
-        userId: userIdValidation.value,
+        userId: new ObjectId(userIdValidation.value),
         year: yearNum,
         totalDays: totalValidation.value,
         usedDays: usedValidation.value,
@@ -173,7 +176,7 @@ export default async function handler(req, res) {
       };
 
       await db.collection('balances').updateOne(
-        { userId: userIdValidation.value, year: yearNum },
+        { userId: new ObjectId(userIdValidation.value), year: yearNum },
         { $set: balanceData },
         { upsert: true }
       );

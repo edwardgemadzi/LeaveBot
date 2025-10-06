@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import TeamSettingsModal from './TeamSettingsModal';
 
 interface User {
   _id: string;
@@ -43,6 +44,7 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   
@@ -317,6 +319,16 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
               <div className="team-header">
                 <h3>{team.name}</h3>
                 <div className="team-actions">
+                  <button onClick={() => {
+                    setSelectedTeam(team);
+                    setShowSettingsModal(true);
+                  }} title="Team settings" style={{
+                    background: '#eff6ff',
+                    color: '#3b82f6',
+                    border: '1px solid #bfdbfe'
+                  }}>
+                    ⚙️
+                  </button>
                   <button onClick={() => openMembersModal(team)} title="View members">
                     👥 {team.memberCount}
                   </button>
@@ -541,6 +553,22 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
             </div>
           </div>
         </div>
+      )}
+
+      {/* Team Settings Modal */}
+      {showSettingsModal && selectedTeam && (
+        <TeamSettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => {
+            setShowSettingsModal(false);
+            setSelectedTeam(null);
+          }}
+          team={selectedTeam as any}
+          token={token}
+          onSuccess={() => {
+            loadTeams();
+          }}
+        />
       )}
 
       <style>{`
