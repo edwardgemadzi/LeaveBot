@@ -1,3 +1,8 @@
 {
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^3.0.2",
+    "mongodb": "^6.20.0"
+  }
 }
