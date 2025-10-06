@@ -69,16 +69,18 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
   };
 
   const loadTeams = async () => {
-    const response = await fetch('/api/teams/index', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
-    if (!response.ok) throw new Error('Failed to load teams');
-    const data = await response.json();
-    setTeams(data.teams);
-  };
-
-  const loadLeaders = async () => {
+    try {
+      const response = await fetch('/api/teams', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Failed to load teams');
+      const data: { teams: Team[] } = await response.json();
+      setTeams(data.teams);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };  const loadLeaders = async () => {
     const response = await fetch('/api/users', {
       headers: { Authorization: `Bearer ${token}` }
     });

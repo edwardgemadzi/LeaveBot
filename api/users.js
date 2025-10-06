@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const decoded = jwt.verify(token, JWT_SECRET);
     
     // Check if this is a password change request (has action=password query param)
-    const { action } = req.query;
+    const { action, id } = req.query;
 
     // POST /api/users?action=password - Change password
     if (req.method === 'POST' && action === 'password') {
@@ -51,12 +51,22 @@ export default async function handler(req, res) {
       return await handleCreateUser(req, res, decoded, startTime);
     }
 
+    // PUT /api/users?id={userId} - Update user
+    if (req.method === 'PUT' && id) {
+      return await handleUpdateUser(req, res, decoded, startTime, id);
+    }
+
+    // DELETE /api/users?id={userId} - Delete user
+    if (req.method === 'DELETE' && id) {
+      return await handleDeleteUser(req, res, decoded, startTime, id);
+    }
+
     // GET /api/users - List users
     if (req.method === 'GET') {
       return await handleListUsers(req, res, decoded, startTime);
     }
 
-    return res.status(400).json({ success: false, error: 'Invalid action' });
+    return res.status(400).json({ success: false, error: 'Invalid action or missing parameters' });
 
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -254,5 +264,152 @@ async function handlePasswordChange(req, res, decoded, startTime) {
   return res.status(200).json({ 
     success: true, 
     message: 'Password updated successfully'
+  });
+}
+
+// Handler for updating users (PUT /api/users?id={userId})
+async function handleUpdateUser(req, res, decoded, startTime, userId) {
+  // Rate limiting for mutations
+  const rateLimit = rateLimiters.mutation(req);
+  Object.entries(rateLimit.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
+  if (!rateLimit.allowed) {
+    logger.warn('Rate limit exceeded', { endpoint: '/api/users', action: 'update', ip: req.headers['x-forwarded-for'] });
+    return res.status(429).json({ success: false, error: rateLimit.message });
+  }
+
+  if (!['admin', 'leader'].includes(decoded.role)) {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+
+  // Validate userId
+  const userIdValidation = validateObjectId(userId);
+  if (!userIdValidation.valid) {
+    return res.status(400).json({ success: false, error: userIdValidation.error });
+  }
+
+  const { name, role } = req.body;
+
+  const updateData = {};
+
+  // Validate and add name if provided
+  if (name) {
+    const nameValidation = validateName(name);
+    if (!nameValidation.valid) {
+      return res.status(400).json({ success: false, error: nameValidation.error });
+    }
+    updateData.name = nameValidation.value;
+  }
+
+  // Validate and add role if provided
+  if (role) {
+    const roleValidation = validateRole(role);
+    if (!roleValidation.valid) {
+      return res.status(400).json({ success: false, error: roleValidation.error });
+    }
+
+    // Leaders cannot create/update to admin role
+    if (decoded.role === 'leader' && role === 'admin') {
+      return res.status(403).json({ success: false, error: 'Leaders cannot set admin role' });
+    }
+
+    updateData.role = roleValidation.value;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({ success: false, error: 'No valid update fields provided' });
+  }
+
+  updateData.updatedAt = new Date();
+
+  const client = await connectDB();
+  const db = client.db('leavebot');
+  const usersCollection = db.collection('users');
+
+  // Update user
+  const result = await usersCollection.updateOne(
+    { _id: new ObjectId(userIdValidation.value) },
+    { $set: updateData }
+  );
+
+  if (result.matchedCount === 0) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  logger.info('User updated', { 
+    userId: userIdValidation.value,
+    updatedBy: decoded.username,
+    fields: Object.keys(updateData)
+  });
+
+  const duration = Date.now() - startTime;
+  logger.response(req, res, duration);
+
+  return res.status(200).json({ 
+    success: true, 
+    message: 'User updated successfully'
+  });
+}
+
+// Handler for deleting users (DELETE /api/users?id={userId})
+async function handleDeleteUser(req, res, decoded, startTime, userId) {
+  // Rate limiting for mutations
+  const rateLimit = rateLimiters.mutation(req);
+  Object.entries(rateLimit.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
+  if (!rateLimit.allowed) {
+    logger.warn('Rate limit exceeded', { endpoint: '/api/users', action: 'delete', ip: req.headers['x-forwarded-for'] });
+    return res.status(429).json({ success: false, error: rateLimit.message });
+  }
+
+  // Only admins can delete users
+  if (decoded.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Only admins can delete users' });
+  }
+
+  // Validate userId
+  const userIdValidation = validateObjectId(userId);
+  if (!userIdValidation.valid) {
+    return res.status(400).json({ success: false, error: userIdValidation.error });
+  }
+
+  const client = await connectDB();
+  const db = client.db('leavebot');
+  const usersCollection = db.collection('users');
+  const leavesCollection = db.collection('leaves');
+
+  // Check if user exists
+  const user = await usersCollection.findOne({ _id: new ObjectId(userIdValidation.value) });
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  // Prevent deleting yourself
+  if (user._id.toString() === decoded.id) {
+    return res.status(400).json({ success: false, error: 'Cannot delete your own account' });
+  }
+
+  // Delete user's leave requests
+  await leavesCollection.deleteMany({ userId: userIdValidation.value });
+
+  // Delete user
+  await usersCollection.deleteOne({ _id: new ObjectId(userIdValidation.value) });
+
+  logger.info('User deleted', { 
+    deletedUser: user.username,
+    deletedBy: decoded.username,
+    ip: req.headers['x-forwarded-for']
+  });
+
+  const duration = Date.now() - startTime;
+  logger.response(req, res, duration);
+
+  return res.status(200).json({ 
+    success: true, 
+    message: 'User and associated leave requests deleted successfully'
   });
 }
