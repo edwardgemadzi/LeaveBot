@@ -434,12 +434,14 @@ function App() {
           icon="📋"
           label="Leave List"
         />
-        <NavTab 
-          active={currentView === 'form'} 
-          onClick={() => setCurrentView('form')}
-          icon="✏️"
-          label="Request Leave"
-        />
+        {user.role === 'user' && (
+          <NavTab 
+            active={currentView === 'form'} 
+            onClick={() => setCurrentView('form')}
+            icon="✏️"
+            label="Request Leave"
+          />
+        )}
         {user.role === 'admin' && (
           <NavTab 
             active={currentView === 'teams'} 
@@ -453,7 +455,7 @@ function App() {
             active={currentView === 'team'} 
             onClick={() => setCurrentView('team')}
             icon="👥"
-            label="Users"
+            label="Team Management"
           />
         )}
       </div>
