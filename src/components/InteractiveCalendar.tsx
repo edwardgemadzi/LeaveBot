@@ -83,10 +83,8 @@ export default function LeaveCalendar({ user, leaves, onRequestLeave }: LeaveCal
       }
     }
 
-    // Filter to show only approved leaves for better visibility
-    const approvedLeaves = filteredLeaves.filter(l => l.status === 'approved')
-
-    return approvedLeaves.map(leave => {
+    // Show all leaves (approved, pending, rejected) for visibility
+    return filteredLeaves.map(leave => {
       const startDate = new Date(leave.startDate)
       // Add 1 day to end date to include the last day (calendar end is exclusive)
       const endDate = addDays(new Date(leave.endDate), 1)

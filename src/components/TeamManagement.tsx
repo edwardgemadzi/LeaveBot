@@ -61,8 +61,8 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
     try {
       await Promise.all([loadTeams(), loadLeaders(), loadAllUsers()]);
     } catch (err) {
-      setError('Failed to load data');
-      console.error(err);
+      setError(`Failed to load data: ${err instanceof Error ? err.message : 'Unknown error'}. The API may need to redeploy.`);
+      console.error('Load error details:', err);
     } finally {
       setLoading(false);
     }
