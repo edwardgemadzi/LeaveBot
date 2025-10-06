@@ -135,13 +135,16 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
 
     setError('')
     try {
-      const res = await fetch(`/api/users?id=${changingPasswordFor.id || changingPasswordFor._id}`, {
+      const res = await fetch('/api/users/password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ newPassword })
+        body: JSON.stringify({ 
+          userId: changingPasswordFor.id || changingPasswordFor._id,
+          newPassword 
+        })
       })
 
       const data = await res.json()
