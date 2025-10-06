@@ -10,6 +10,10 @@ interface Leave {
   reason: string
   status: 'pending' | 'approved' | 'rejected'
   createdAt: string
+  workingDaysCount?: number
+  calendarDaysCount?: number
+  shiftPattern?: string
+  shiftTime?: string
 }
 
 interface User {
@@ -26,33 +30,50 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user, leaves, token }: DashboardProps) {
+  // Helper to calculate working days (falls back to calendar days if not available)
+  const calculateDaysForLeave = (leave: Leave) => {
+    if (leave.workingDaysCount) return leave.workingDaysCount
+    // Fallback: calculate calendar days
+    const start = new Date(leave.startDate)
+    const end = new Date(leave.endDate)
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  }
+
   const stats = useMemo(() => {
     if (user.role === 'admin') {
       // Admin sees all leaves statistics
+      const approvedLeaves = leaves.filter(l => l.status === 'approved')
+      const workingDaysUsed = approvedLeaves.reduce((sum, leave) => sum + calculateDaysForLeave(leave), 0)
+      
       return {
         total: leaves.length,
         pending: leaves.filter(l => l.status === 'pending').length,
-        approved: leaves.filter(l => l.status === 'approved').length,
+        approved: approvedLeaves.length,
         rejected: leaves.filter(l => l.status === 'rejected').length,
         thisMonth: leaves.filter(l => {
           const date = new Date(l.createdAt)
           const now = new Date()
           return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
         }).length,
+        workingDaysUsed,
       }
     } else {
       // User sees only their leaves
       const myLeaves = leaves.filter(l => l.userId === user.id)
+      const approvedLeaves = myLeaves.filter(l => l.status === 'approved')
+      const workingDaysUsed = approvedLeaves.reduce((sum, leave) => sum + calculateDaysForLeave(leave), 0)
+      
       return {
         total: myLeaves.length,
         pending: myLeaves.filter(l => l.status === 'pending').length,
-        approved: myLeaves.filter(l => l.status === 'approved').length,
+        approved: approvedLeaves.length,
         rejected: myLeaves.filter(l => l.status === 'rejected').length,
         thisMonth: myLeaves.filter(l => {
           const date = new Date(l.createdAt)
           const now = new Date()
           return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
         }).length,
+        workingDaysUsed,
       }
     }
   }, [leaves, user])
@@ -121,6 +142,7 @@ export default function Dashboard({ user, leaves, token }: DashboardProps) {
           value={stats.approved}
           color="#10b981"
           icon="✅"
+          subtitle={`${stats.workingDaysUsed} working days used`}
         />
         <StatCard
           title="Rejected"
@@ -256,7 +278,13 @@ export default function Dashboard({ user, leaves, token }: DashboardProps) {
   )
 }
 
-function StatCard({ title, value, color, icon }: { title: string; value: number; color: string; icon: string }) {
+function StatCard({ title, value, color, icon, subtitle }: { 
+  title: string; 
+  value: number; 
+  color: string; 
+  icon: string;
+  subtitle?: string;
+}) {
   return (
     <div style={{
       background: 'white',
@@ -283,6 +311,16 @@ function StatCard({ title, value, color, icon }: { title: string; value: number;
       <div style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
         {title}
       </div>
+      {subtitle && (
+        <div style={{ 
+          fontSize: '12px', 
+          color: '#9ca3af', 
+          marginTop: '6px',
+          fontWeight: '400' 
+        }}>
+          {subtitle}
+        </div>
+      )}
     </div>
   )
 }

@@ -99,6 +99,7 @@ export default async function handler(req, res) {
     }
     
     const { employeeName, startDate, endDate, reason } = validation.data;
+    const { workingDaysCount, calendarDaysCount, shiftPattern, shiftTime } = req.body;
     
     const leaveData = {
       userId: auth.user.id,
@@ -106,7 +107,12 @@ export default async function handler(req, res) {
       employeeName,
       startDate,
       endDate,
-      reason
+      reason,
+      // Include calculated working days if provided
+      ...(workingDaysCount !== undefined && { workingDaysCount: Number(workingDaysCount) }),
+      ...(calendarDaysCount !== undefined && { calendarDaysCount: Number(calendarDaysCount) }),
+      ...(shiftPattern && { shiftPattern: String(shiftPattern) }),
+      ...(shiftTime && { shiftTime: String(shiftTime) })
     };
     
     const newLeave = await addLeaveRequest(leaveData);
@@ -115,7 +121,8 @@ export default async function handler(req, res) {
       leaveId: newLeave._id?.toString(), 
       userId: auth.user.id,
       startDate,
-      endDate 
+      endDate,
+      workingDays: workingDaysCount
     });
     
     const duration = Date.now() - startTime;

@@ -31,6 +31,14 @@ function App() {
   const [availableTeams, setAvailableTeams] = useState<any[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
+  const [calculatedDays, setCalculatedDays] = useState<{
+    workingDays: number
+    calendarDays: number
+    warning: string | null
+    shiftPattern?: string
+    shiftTime?: string
+  } | null>(null)
+  const [calculatingDays, setCalculatingDays] = useState(false)
 
   // Filter leaves based on search and status
   const filteredLeaves = useMemo(() => {
@@ -62,6 +70,58 @@ function App() {
       loadTeams()
     }
   }, [isRegistering])
+
+  // Calculate working days when dates change
+  useEffect(() => {
+    if (!startDate || !endDate || !token) {
+      setCalculatedDays(null)
+      return
+    }
+
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    
+    if (end < start) {
+      setCalculatedDays(null)
+      return
+    }
+
+    const calculateDays = async () => {
+      setCalculatingDays(true)
+      try {
+        const res = await fetch('/api/leaves/calculate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ startDate, endDate })
+        })
+        
+        if (res.ok) {
+          const data = await res.json()
+          setCalculatedDays({
+            workingDays: data.workingDays,
+            calendarDays: data.calendarDays,
+            warning: data.warning,
+            shiftPattern: data.shiftPattern,
+            shiftTime: data.shiftTime
+          })
+        } else {
+          setCalculatedDays(null)
+        }
+      } catch (err) {
+        console.error('Failed to calculate working days:', err)
+        setCalculatedDays(null)
+      } finally {
+        setCalculatingDays(false)
+      }
+    }
+
+    // Debounce the calculation
+    const timer = setTimeout(calculateDays, 300)
+    return () => clearTimeout(timer)
+  }, [startDate, endDate, token])
 
   async function loadTeams() {
     try {
@@ -191,7 +251,16 @@ function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ employeeName, startDate, endDate, reason })
+        body: JSON.stringify({ 
+          employeeName, 
+          startDate, 
+          endDate, 
+          reason,
+          workingDaysCount: calculatedDays?.workingDays,
+          calendarDaysCount: calculatedDays?.calendarDays,
+          shiftPattern: calculatedDays?.shiftPattern,
+          shiftTime: calculatedDays?.shiftTime
+        })
       })
       const data = await res.json()
       
@@ -207,6 +276,7 @@ function App() {
         setStartDate('')
         setEndDate('')
         setReason('')
+        setCalculatedDays(null)
         setCurrentView('list')
         loadLeaves()
       } else {
@@ -436,6 +506,81 @@ function App() {
               required
               disabled={loading}
             />
+            
+            {/* Working Days Display */}
+            {calculatedDays && (
+              <div style={{
+                padding:'15px',
+                margin:'10px 0',
+                background:'#f0fdf4',
+                border:'1px solid #86efac',
+                borderRadius:'5px'
+              }}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
+                  <span style={{fontSize:'20px',fontWeight:'bold',color:'#059669'}}>
+                    📊 {calculatedDays.workingDays} working day{calculatedDays.workingDays !== 1 ? 's' : ''}
+                  </span>
+                  <span style={{fontSize:'14px',color:'#6b7280'}}>
+                    ({calculatedDays.calendarDays} calendar day{calculatedDays.calendarDays !== 1 ? 's' : ''})
+                  </span>
+                </div>
+                {calculatedDays.shiftPattern && (
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    <span style={{
+                      padding:'4px 10px',
+                      background:'#e0e7ff',
+                      color:'#4338ca',
+                      borderRadius:'12px',
+                      fontSize:'13px',
+                      fontWeight:'500'
+                    }}>
+                      {calculatedDays.shiftPattern === 'regular' ? '📅 Regular' : 
+                       calculatedDays.shiftPattern === '2-2' ? '🔄 2/2' :
+                       calculatedDays.shiftPattern === '5-2' ? '🔄 5/2' : '📅 Custom'}
+                    </span>
+                    {calculatedDays.shiftTime && (
+                      <span style={{
+                        padding:'4px 10px',
+                        background:'#fef3c7',
+                        color:'#92400e',
+                        borderRadius:'12px',
+                        fontSize:'13px',
+                        fontWeight:'500'
+                      }}>
+                        {calculatedDays.shiftTime === 'day' ? '☀️ Day' : '🌙 Night'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {calculatingDays && (
+              <div style={{
+                padding:'15px',
+                margin:'10px 0',
+                background:'#f3f4f6',
+                border:'1px solid #d1d5db',
+                borderRadius:'5px',
+                color:'#6b7280',
+                fontSize:'14px'
+              }}>
+                ⏳ Calculating working days...
+              </div>
+            )}
+            {calculatedDays?.warning && (
+              <div style={{
+                padding:'15px',
+                margin:'10px 0',
+                background:'#fef3c7',
+                border:'1px solid #fbbf24',
+                borderRadius:'5px',
+                color:'#92400e',
+                fontSize:'14px'
+              }}>
+                ⚠️ {calculatedDays.warning}
+              </div>
+            )}
+            
             <textarea 
               placeholder="Reason (optional)" 
               value={reason}
@@ -546,6 +691,17 @@ function LeaveCard({ leave, isAdmin, onStatusUpdate, token, showToast, showError
 }) {
   const [updating, setUpdating] = useState(false)
 
+  // Calculate calendar days
+  const calculateCalendarDays = (start: string, end: string) => {
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+  }
+
+  const calendarDays = calculateCalendarDays(leave.startDate, leave.endDate)
+  const workingDays = leave.workingDaysCount || calendarDays // Fall back to calendar days if not calculated
+
   async function updateStatus(status: 'approved' | 'rejected') {
     setUpdating(true)
     try {
@@ -591,8 +747,54 @@ function LeaveCard({ leave, isAdmin, onStatusUpdate, token, showToast, showError
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:'10px'}}>
         <div>
           <strong style={{fontSize:'18px',color:'#1f2937'}}>{leave.employeeName}</strong>
-          <div style={{display:'flex',gap:'10px',marginTop:'8px',fontSize:'14px',color:'#6b7280'}}>
+          <div style={{display:'flex',gap:'10px',marginTop:'8px',fontSize:'14px',color:'#6b7280',alignItems:'center'}}>
             <span>📅 {new Date(leave.startDate).toLocaleDateString()} - {new Date(leave.endDate).toLocaleDateString()}</span>
+          </div>
+          {/* Working Days Display */}
+          <div style={{marginTop:'8px',display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{
+              fontSize:'16px',
+              fontWeight:'bold',
+              color:'#059669',
+              display:'inline-flex',
+              alignItems:'center',
+              gap:'4px'
+            }}>
+              📊 {workingDays} working day{workingDays !== 1 ? 's' : ''}
+            </span>
+            <span style={{fontSize:'13px',color:'#6b7280'}}>
+              ({calendarDays} calendar day{calendarDays !== 1 ? 's' : ''})
+            </span>
+            {/* Shift Pattern Badge */}
+            {leave.shiftPattern && (
+              <span style={{
+                padding:'2px 8px',
+                background:'#dbeafe',
+                color:'#1e40af',
+                borderRadius:'12px',
+                fontSize:'11px',
+                fontWeight:'600'
+              }}>
+                {leave.shiftPattern === 'regular' ? '📅 Regular' : 
+                 leave.shiftPattern === '2-2' ? '🔄 2/2' :
+                 leave.shiftPattern === '5-2' ? '🔄 5/2' : 
+                 '🔄 Custom'}
+              </span>
+            )}
+            {leave.shiftTime && (
+              <span style={{
+                padding:'2px 8px',
+                background:'#fef3c7',
+                color:'#92400e',
+                borderRadius:'12px',
+                fontSize:'11px',
+                fontWeight:'600'
+              }}>
+                {leave.shiftTime === 'day' ? '☀️ Day' : 
+                 leave.shiftTime === 'night' ? '🌙 Night' : 
+                 '⏰ Custom'}
+              </span>
+            )}
           </div>
         </div>
         <span style={{

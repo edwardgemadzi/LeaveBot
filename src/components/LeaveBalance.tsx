@@ -70,7 +70,7 @@ export function LeaveBalance({ userId, token }: LeaveBalanceProps) {
             <Calendar className="w-4 h-4 text-brand-500" />
           </div>
           <p className="text-2xl font-bold text-slate-900">{balance.totalDays}</p>
-          <p className="text-xs text-slate-500 mt-1">days per year</p>
+          <p className="text-xs text-slate-500 mt-1">working days/year</p>
         </div>
       </div>
 
@@ -81,6 +81,7 @@ export function LeaveBalance({ userId, token }: LeaveBalanceProps) {
             <CheckCircle className="w-4 h-4 text-emerald-500" />
           </div>
           <p className="text-2xl font-bold text-slate-900">{balance.usedDays}</p>
+          <p className="text-xs text-slate-500 mt-1">working days</p>
           <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div 
               className="h-full bg-emerald-500 transition-all"
@@ -97,7 +98,7 @@ export function LeaveBalance({ userId, token }: LeaveBalanceProps) {
             <Clock className="w-4 h-4 text-amber-500" />
           </div>
           <p className="text-2xl font-bold text-slate-900">{balance.pendingDays}</p>
-          <p className="text-xs text-slate-500 mt-1">awaiting approval</p>
+          <p className="text-xs text-slate-500 mt-1">working days pending</p>
         </div>
       </div>
 
@@ -108,6 +109,7 @@ export function LeaveBalance({ userId, token }: LeaveBalanceProps) {
             <TrendingUp className="w-4 h-4 text-brand-600" />
           </div>
           <p className="text-2xl font-bold text-brand-900">{balance.availableDays}</p>
+          <p className="text-xs text-slate-500 mt-1">working days left</p>
           <div className="mt-2 h-1.5 bg-brand-100 rounded-full overflow-hidden">
             <div 
               className="h-full bg-brand-600 transition-all"
