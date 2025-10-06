@@ -69,7 +69,7 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, token }) =
   };
 
   const loadTeams = async () => {
-    const response = await fetch('/api/teams', {
+    const response = await fetch('/api/teams/index', {
       headers: { Authorization: `Bearer ${token}` }
     });
     
