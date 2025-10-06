@@ -43,7 +43,8 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/users/index', {
+      const res = await fetch('/api/users', {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -135,7 +136,7 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
 
     setError('')
     try {
-      const res = await fetch('/api/users/password', {
+      const res = await fetch('/api/users?action=password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -181,7 +182,7 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
     setError('')
     setAddingUser(true)
     try {
-      const res = await fetch('/api/users/create', {
+      const res = await fetch('/api/users?action=create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
