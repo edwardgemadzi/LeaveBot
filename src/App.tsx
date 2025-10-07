@@ -34,6 +34,7 @@ function App() {
   const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
   const [showProfileSettings, setShowProfileSettings] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [userSettings, setUserSettings] = useState<any>(null)
   const [calculatedDays, setCalculatedDays] = useState<{
     workingDays: number
     calendarDays: number
@@ -73,6 +74,7 @@ function App() {
       setToken(savedToken)
       setUser(parsedUser)
       loadLeaves(savedToken)
+      loadUserSettings(parsedUser.id, savedToken) // Load settings on mount
     }
   }, [])
 
@@ -165,6 +167,24 @@ function App() {
     }
   }
 
+  async function loadUserSettings(userId: string, authToken: string) {
+    try {
+      const res = await fetch(`/api/users?id=${userId}&action=settings`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.settings) {
+          setUserSettings(data.settings)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load user settings:', err)
+    }
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -189,6 +209,7 @@ function App() {
         setPassword('') // Clear password from memory
         success(`Welcome back, ${data.user.name}!`)
         loadLeaves(data.token)
+        loadUserSettings(data.user.id, data.token) // Load user settings
       } else {
         setError(data.error || 'Login failed')
       }
@@ -505,6 +526,7 @@ function App() {
         <InteractiveCalendar 
           user={user} 
           leaves={leaves}
+          userSettings={userSettings}
           onRequestLeave={(startDate, endDate) => {
             setStartDate(startDate.toISOString().split('T')[0])
             setEndDate(endDate.toISOString().split('T')[0])

@@ -471,7 +471,7 @@ async function handleGetUserSettings(req, res, decoded, startTime, id) {
   const teamsCollection = db.collection('teams');
 
   // Validate user ID
-  const userIdValidation = validateUserId(id);
+  const userIdValidation = validateObjectId(id);
   if (!userIdValidation.valid) {
     return res.status(400).json({ success: false, error: userIdValidation.error });
   }
@@ -543,7 +543,7 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
   const usersCollection = db.collection('users');
 
   // Validate user ID
-  const userIdValidation = validateUserId(id);
+  const userIdValidation = validateObjectId(id);
   if (!userIdValidation.valid) {
     return res.status(400).json({ success: false, error: userIdValidation.error });
   }
@@ -554,12 +554,39 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
     return res.status(404).json({ success: false, error: 'User not found' });
   }
 
-  // Check authorization: user can update their own settings, or admins can update any
-  if (decoded.role !== 'admin' && decoded.id !== user._id.toString()) {
-    return res.status(403).json({ 
-      success: false, 
-      error: 'Unauthorized: You can only update your own settings' 
-    });
+  // Check authorization
+  // - User can update their own settings
+  // - Admins can update any user's settings
+  // - Leaders can update their team members' settings
+  if (decoded.id !== user._id.toString()) {
+    if (decoded.role === 'admin') {
+      // Admin can update any user
+    } else if (decoded.role === 'leader') {
+      // Leader can only update team members (not admins or other leaders)
+      if (user.role === 'admin' || user.role === 'leader') {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Leaders cannot update admin or leader settings' 
+        });
+      }
+      
+      // Check if user is in leader's team
+      const teamsCollection = db.collection('teams');
+      const team = await teamsCollection.findOne({ leaderId: new ObjectId(decoded.id) });
+      
+      if (!team || !user.teamId || user.teamId.toString() !== team._id.toString()) {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Can only update settings for users in your team' 
+        });
+      }
+    } else {
+      // Regular user can only update own settings
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Unauthorized: You can only update your own settings' 
+      });
+    }
   }
 
   // Validate settings structure

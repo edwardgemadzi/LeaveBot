@@ -36,9 +36,32 @@ interface User {
   teamId?: string
 }
 
+interface UserSettings {
+  shiftPattern: {
+    type: string
+    customPattern?: string
+    referenceDate?: string
+  }
+  shiftTime: {
+    type: string
+    customStart?: string
+    customEnd?: string
+  }
+  workingDays: {
+    monday: boolean
+    tuesday: boolean
+    wednesday: boolean
+    thursday: boolean
+    friday: boolean
+    saturday: boolean
+    sunday: boolean
+  }
+}
+
 interface LeaveCalendarProps {
   user: User
   leaves: Leave[]
+  userSettings?: UserSettings | null
   onRequestLeave?: (startDate: Date, endDate: Date) => void
   onRefresh?: () => void
   showToast?: (message: string) => void
@@ -52,10 +75,50 @@ interface CalendarEvent {
   resource: Leave
 }
 
-export default function LeaveCalendar({ user, leaves, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
+export default function LeaveCalendar({ user, leaves, userSettings, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
   const [view, setView] = useState<string>('month')
   const [showTeamOnly, setShowTeamOnly] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
+
+  // Helper: Check if a date is a working day based on user's shift pattern
+  const isWorkingDay = (date: Date): boolean => {
+    if (!userSettings) return true // If no settings, allow all days
+    
+    const { shiftPattern, workingDays } = userSettings
+    
+    // Get day of week (0 = Sunday, 1 = Monday, etc.)
+    const dayOfWeek = date.getDay()
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const dayName = dayNames[dayOfWeek] as keyof typeof workingDays
+    
+    // For regular pattern, just check working days
+    if (shiftPattern.type === 'regular') {
+      return workingDays[dayName] || false
+    }
+    
+    // For rotation patterns (2-2, 3-3, 4-4, 5-5), calculate based on reference date
+    if (shiftPattern.referenceDate) {
+      const referenceDate = new Date(shiftPattern.referenceDate)
+      const daysSinceReference = Math.floor((date.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      // Extract cycle length from pattern type (e.g., "2-2" -> 2+2=4 day cycle)
+      const match = shiftPattern.type.match(/^(\d+)-(\d+)$/)
+      if (match) {
+        const workDays = parseInt(match[1])
+        const offDays = parseInt(match[2])
+        const cycleLength = workDays + offDays
+        const positionInCycle = ((daysSinceReference % cycleLength) + cycleLength) % cycleLength
+        
+        // First part of cycle is working days
+        const isInWorkingPeriod = positionInCycle < workDays
+        
+        // Also check if it's a valid working day of the week
+        return isInWorkingPeriod && (workingDays[dayName] || false)
+      }
+    }
+    
+    return workingDays[dayName] || false
+  }
 
   const events: CalendarEvent[] = useMemo(() => {
     let filteredLeaves = leaves
@@ -103,10 +166,45 @@ export default function LeaveCalendar({ user, leaves, onRequestLeave, onRefresh,
     
     if (onRequestLeave) {
       const start = slotInfo.start
-      const end = slotInfo.end
+      let end = slotInfo.end
+      
+      // Calendar end date is exclusive, so subtract 1 day to get actual last day
+      end = addDays(end, -1)
+      
+      // Validate: First day must be a working day
+      if (!isWorkingDay(start)) {
+        if (showToast) {
+          showToast('⚠️ The first day must be a working day according to your shift pattern.')
+        }
+        return
+      }
+      
+      // Validate: Check if any selected days are non-working days
+      let hasNonWorkingDay = false
+      const current = new Date(start)
+      while (current <= end) {
+        if (!isWorkingDay(current)) {
+          hasNonWorkingDay = true
+          break
+        }
+        current.setDate(current.getDate() + 1)
+      }
+      
+      if (hasNonWorkingDay) {
+        if (showToast) {
+          showToast('ℹ️ Selection includes non-working days. Only working days will be counted.')
+        }
+      }
+      
+      // Calculate working days count
+      const workingDaysCount = Array.from({ length: Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 }, (_, i) => {
+        const d = new Date(start)
+        d.setDate(d.getDate() + i)
+        return d
+      }).filter(d => isWorkingDay(d)).length
       
       if (showToast) {
-        showToast(`Selected: ${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')}. Opening request form...`)
+        showToast(`Selected: ${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')} (${workingDaysCount} working days). Opening request form...`)
       }
       
       onRequestLeave(start, end)
