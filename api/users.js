@@ -603,55 +603,23 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
       });
     }
 
-    const validPatterns = ['regular', '2-2', '3-3', '4-4', '5-5', '5-2', 'custom'];
+    const validPatterns = ['regular', '2-2', '3-3', '4-4', '5-5'];
     if (!validPatterns.includes(shiftPattern.type)) {
       return res.status(400).json({ 
         success: false, 
         error: `Invalid shift pattern type. Must be one of: ${validPatterns.join(', ')}` 
       });
     }
-    const isRotatingPattern = shiftPattern.type !== 'regular';
 
-    // For rotation patterns, ensure reference date is present (fallback to existing or today)
-    if (isRotatingPattern) {
-      const referenceDate = shiftPattern.referenceDate || user.settings?.shiftPattern?.referenceDate;
-      if (!referenceDate) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Rotation shift patterns require a reference date' 
-        });
-      }
-      shiftPattern.referenceDate = referenceDate;
-
-      // Handle custom patterns (e.g., 3-2)
-      if (shiftPattern.type === 'custom') {
-        const pattern = (shiftPattern.customPattern || '').trim();
-        if (!/^\d+-\d+$/.test(pattern)) {
-          return res.status(400).json({ 
-            success: false, 
-            error: 'Custom pattern must be in the format "X-Y" (e.g., 3-2)' 
-          });
-        }
-
-        const [workDaysStr, offDaysStr] = pattern.split('-');
-        const workDays = parseInt(workDaysStr, 10);
-        const offDays = parseInt(offDaysStr, 10);
-
-        if (!Number.isFinite(workDays) || !Number.isFinite(offDays) || workDays <= 0 || offDays <= 0) {
-          return res.status(400).json({ 
-            success: false, 
-            error: 'Custom pattern values must be positive integers' 
-          });
-        }
-
-        shiftPattern.customPattern = `${workDays}-${offDays}`;
-      }
+    // For rotation patterns, require reference date
+    if (shiftPattern.type !== 'regular' && !shiftPattern.referenceDate) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Rotation shift patterns require a reference date' 
+      });
     }
 
-    newSettings.shiftPattern = {
-      ...user.settings?.shiftPattern,
-      ...shiftPattern
-    };
+    newSettings.shiftPattern = shiftPattern;
   }
 
   // Validate shift time
@@ -663,7 +631,7 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
       });
     }
 
-    const validTimes = ['day', 'night', 'custom'];
+    const validTimes = ['day', 'night'];
     if (!validTimes.includes(shiftTime.type)) {
       return res.status(400).json({ 
         success: false, 
@@ -671,25 +639,7 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
       });
     }
 
-    if (shiftTime.type === 'custom') {
-      const customStart = shiftTime.customStart || user.settings?.shiftTime?.customStart;
-      const customEnd = shiftTime.customEnd || user.settings?.shiftTime?.customEnd;
-
-      if (!customStart || !customEnd) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Custom shift time requires both start and end times' 
-        });
-      }
-
-      shiftTime.customStart = customStart;
-      shiftTime.customEnd = customEnd;
-    }
-
-    newSettings.shiftTime = {
-      ...user.settings?.shiftTime,
-      ...shiftTime
-    };
+    newSettings.shiftTime = shiftTime;
   }
 
   // Validate working days
@@ -711,20 +661,14 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
       }
     }
 
-    const targetPatternType = newSettings.shiftPattern?.type || user.settings?.shiftPattern?.type || 'regular';
-
-    if (!hasAtLeastOneDay) {
-      if (targetPatternType === 'regular') {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'At least one working day must be selected for regular patterns' 
-        });
-      }
-
-      // For rotating patterns, default to all days being potential working days
-      for (const day of validDays) {
-        workingDaysObj[day] = true;
-      }
+    // Only require at least one day for 'regular' patterns
+    // Rotation patterns (2-2, 3-3, etc) work any day of the week
+    const patternType = newSettings.shiftPattern?.type || user.settings?.shiftPattern?.type || 'regular';
+    if (!hasAtLeastOneDay && patternType === 'regular') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'At least one working day must be selected for regular patterns' 
+      });
     }
 
     newSettings.workingDays = workingDaysObj;
