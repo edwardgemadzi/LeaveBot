@@ -214,8 +214,8 @@ export async function getAllLeaves(userId = null, role = 'user') {
       // Find the team where this user is the leader
       const team = await teamsCollection.findOne({ leaderId: new ObjectId(userId) });
       if (!team) {
-        // Leader has no team, return empty
-        return [];
+        // Leader has no team, show their own leaves as fallback
+        return await leavesCollection.find({ userId }).sort({ createdAt: -1 }).toArray();
       }
       
       // Get all users in the leader's team

@@ -169,9 +169,9 @@ export default async function handler(req, res) {
       let concurrentCount = 0;
       
       if (teamSettings?.concurrentLeave?.enabled && user?.teamId) {
-        // Find overlapping leaves
+        // Find overlapping leaves (include pending to prevent race conditions)
         const overlappingLeaves = await leavesCollection.find({
-          status: 'approved',
+          status: { $in: ['approved', 'pending'] },
           $or: [
             { startDate: { $lte: endDate }, endDate: { $gte: startDate } }
           ]
@@ -209,13 +209,13 @@ export default async function handler(req, res) {
         workingDays: result.count,
         calendarDays: result.calendarDays,
         affectedDates: result.dates,
-        shiftPattern: teamSettings.shiftPattern.type,
-        shiftTime: teamSettings.shiftTime.type,
+        shiftPattern: teamSettings?.shiftPattern?.type || 'regular',
+        shiftTime: teamSettings?.shiftTime?.type || 'day',
         warning: concurrentWarning,
         concurrentInfo: {
           count: concurrentCount,
-          limit: teamSettings.concurrentLeave?.maxPerTeam || 0,
-          enabled: teamSettings.concurrentLeave?.enabled || false
+          limit: teamSettings?.concurrentLeave?.maxPerTeam || 0,
+          enabled: teamSettings?.concurrentLeave?.enabled || false
         }
       });
     } catch (err) {
@@ -240,6 +240,11 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
+    // Admins and leaders cannot request leaves - they only manage team members
+    if (auth.user.role === 'admin' || auth.user.role === 'leader') {
+      return res.status(403).json({ error: 'Admins and leaders cannot request leaves. This feature is only for team members.' });
+    }
+    
     // Validate input
     const validation = validateLeaveRequest(req.body);
     if (!validation.valid) {

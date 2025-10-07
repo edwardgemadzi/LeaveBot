@@ -71,6 +71,27 @@ export default async function handler(req, res) {
   if (teamId) {
     const { ObjectId } = await import('mongodb');
     userData.teamId = new ObjectId(teamId);
+    
+    // Apply team default settings if available
+    try {
+      const { connectToDatabase } = await import('./shared/mongodb-storage.js');
+      const { db } = await connectToDatabase();
+      const team = await db.collection('teams').findOne({ _id: userData.teamId });
+      
+      if (team?.settings?.defaults) {
+        userData.settings = team.settings.defaults;
+        logger.info('Applied team default settings to new user', { 
+          username: usernameValidation.value, 
+          teamId: teamId 
+        });
+      }
+    } catch (error) {
+      logger.warn('Failed to apply team defaults during registration', { 
+        error: error.message, 
+        teamId 
+      });
+      // Don't fail registration if settings fetch fails
+    }
   }
   
   const newUser = await addUser(userData);

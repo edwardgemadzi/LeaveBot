@@ -514,9 +514,21 @@ async function handleAssignUser(req, res, decoded, startTime, teamId) {
     }
 
     // Assign user to team
+    const updateData = { teamId: new ObjectId(teamId) };
+    
+    // If user has no custom settings, apply team defaults
+    if ((!user.settings || Object.keys(user.settings).length === 0) && team.settings?.defaults) {
+      updateData.settings = team.settings.defaults;
+      logger.info('Applied team default settings to user', { 
+        userId, 
+        teamId, 
+        teamName: team.name 
+      });
+    }
+    
     await usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { $set: { teamId: new ObjectId(teamId) } }
+      { $set: updateData }
     );
 
     const duration = Date.now() - startTime;

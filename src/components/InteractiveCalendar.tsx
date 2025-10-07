@@ -40,6 +40,7 @@ interface LeaveCalendarProps {
   user: User
   leaves: Leave[]
   onRequestLeave?: (startDate: Date, endDate: Date) => void
+  onRefresh?: () => void
 }
 
 interface CalendarEvent {
@@ -50,7 +51,7 @@ interface CalendarEvent {
   resource: Leave
 }
 
-export default function LeaveCalendar({ user, leaves, onRequestLeave }: LeaveCalendarProps) {
+export default function LeaveCalendar({ user, leaves, onRequestLeave, onRefresh }: LeaveCalendarProps) {
   const [view, setView] = useState<string>('month')
   const [showTeamOnly, setShowTeamOnly] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
@@ -60,27 +61,18 @@ export default function LeaveCalendar({ user, leaves, onRequestLeave }: LeaveCal
 
     // Filter based on user role and team view preference
     if (user.role === 'admin') {
-      // Admins see all leaves (no filter)
+      // Admins see all leaves (backend already filters appropriately)
+      filteredLeaves = leaves
     } else if (user.role === 'leader') {
-      if (showTeamOnly && user.teamId) {
-        // Leaders can view their team members' leaves
-        filteredLeaves = leaves.filter(l => {
-          const leaveUser = leaves.find(leave => leave.userId === l.userId)
-          return leaveUser && (l.userId === user.id || leaveUser.userId === user.id)
-        })
-      } else {
-        // Show only their own leaves
+      // Leaders see their team's leaves (backend filters by team)
+      // When showTeamOnly is off, show only their own leaves
+      if (!showTeamOnly) {
         filteredLeaves = leaves.filter(l => l.userId === user.id)
       }
+      // When on, backend already filtered by team, show all
     } else {
       // Regular users see only their own leaves
-      if (showTeamOnly && user.teamId) {
-        // If user is part of a team, they can see team leaves
-        // This would require adding teamId to leave objects or fetching team member IDs
-        filteredLeaves = leaves.filter(l => l.userId === user.id)
-      } else {
-        filteredLeaves = leaves.filter(l => l.userId === user.id)
-      }
+      filteredLeaves = leaves.filter(l => l.userId === user.id)
     }
 
     // Show all leaves (approved, pending, rejected) for visibility

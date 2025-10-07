@@ -82,6 +82,24 @@ function App() {
     }
   }, [isRegistering])
 
+  // Auto-refresh leaves every 30 seconds for real-time sync
+  useEffect(() => {
+    if (!token || !user) return
+    
+    const interval = setInterval(() => {
+      loadLeaves()
+    }, 30000) // 30 seconds
+    
+    return () => clearInterval(interval)
+  }, [token, user])
+
+    // Refresh leaves when switching to calendar view
+  useEffect(() => {
+    if (currentView === 'calendar' && token) {
+      loadLeaves()
+    }
+  }, [currentView])
+
   // Calculate working days when dates change
   useEffect(() => {
     if (!startDate || !endDate || !token) {
@@ -495,6 +513,7 @@ function App() {
             setEmployeeName(user.name)
             setCurrentView('form')
           }}
+          onRefresh={() => loadLeaves()}
         />
       )}
 
@@ -650,11 +669,11 @@ function App() {
               <EmptyState 
                 icon="leaves"
                 title="No leave requests yet"
-                description="Submit your first leave request to get started. Your team and admin will be notified for approval."
-                action={{
+                description={user.role === 'user' ? "Submit your first leave request to get started. Your team and admin will be notified for approval." : "No leave requests from team members yet."}
+                action={user.role === 'user' ? {
                   label: '✏️ Request Leave',
                   onClick: () => setCurrentView('form')
-                }}
+                } : undefined}
               />
             ) : (
               <EmptyState 

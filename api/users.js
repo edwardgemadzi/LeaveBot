@@ -219,9 +219,28 @@ async function handlePasswordChange(req, res, decoded, startTime) {
     return res.status(429).json({ success: false, error: rateLimit.message });
   }
 
-  // Only admins can change user passwords
+  // Admins can change any password, leaders can only change team user passwords
   if (decoded.role !== 'admin') {
-    return res.status(403).json({ success: false, error: 'Only admins can change user passwords' });
+    if (decoded.role !== 'leader') {
+      return res.status(403).json({ success: false, error: 'Only admins and leaders can change user passwords' });
+    }
+    
+    // Leaders can only change passwords for users in their team
+    const teamsCollection = db.collection('teams');
+    const team = await teamsCollection.findOne({ leaderId: new ObjectId(decoded.id) });
+    
+    if (!team) {
+      return res.status(403).json({ success: false, error: 'You must be assigned as a team leader to change passwords' });
+    }
+    
+    if (!user.teamId || user.teamId.toString() !== team._id.toString()) {
+      return res.status(403).json({ success: false, error: 'Can only change passwords for users in your team' });
+    }
+    
+    // Leaders cannot change admin or leader passwords
+    if (user.role === 'admin' || user.role === 'leader') {
+      return res.status(403).json({ success: false, error: 'Cannot change passwords for admins or leaders' });
+    }
   }
 
   const { userId, newPassword } = req.body;
@@ -376,9 +395,28 @@ async function handleDeleteUser(req, res, decoded, startTime, userId) {
     return res.status(429).json({ success: false, error: rateLimit.message });
   }
 
-  // Only admins can delete users
+  // Admins can delete anyone, leaders can only delete users in their team
   if (decoded.role !== 'admin') {
-    return res.status(403).json({ success: false, error: 'Only admins can delete users' });
+    if (decoded.role !== 'leader') {
+      return res.status(403).json({ success: false, error: 'Only admins and leaders can delete users' });
+    }
+    
+    // Leaders can only delete users in their team
+    const teamsCollection = db.collection('teams');
+    const team = await teamsCollection.findOne({ leaderId: new ObjectId(decoded.id) });
+    
+    if (!team) {
+      return res.status(403).json({ success: false, error: 'You must be assigned as a team leader to delete users' });
+    }
+    
+    if (!user.teamId || user.teamId.toString() !== team._id.toString()) {
+      return res.status(403).json({ success: false, error: 'Can only delete users in your team' });
+    }
+    
+    // Leaders cannot delete admins or other leaders
+    if (user.role === 'admin' || user.role === 'leader') {
+      return res.status(403).json({ success: false, error: 'Cannot delete admins or leaders' });
+    }
   }
 
   // Validate userId
@@ -404,7 +442,7 @@ async function handleDeleteUser(req, res, decoded, startTime, userId) {
   }
 
   // Delete user's leave requests
-  await leavesCollection.deleteMany({ userId: userIdValidation.value });
+  await leavesCollection.deleteMany({ userId: new ObjectId(userIdValidation.value) });
 
   // Delete user
   await usersCollection.deleteOne({ _id: new ObjectId(userIdValidation.value) });
@@ -426,8 +464,11 @@ async function handleDeleteUser(req, res, decoded, startTime, userId) {
 
 // Handler: Get user settings
 async function handleGetUserSettings(req, res, decoded, startTime, id) {
-  const usersCollection = req.usersCollection;
-  const teamsCollection = req.teamsCollection;
+  // Connect to database
+  const client = await connectDB();
+  const db = client.db('leavebot');
+  const usersCollection = db.collection('users');
+  const teamsCollection = db.collection('teams');
 
   // Validate user ID
   const userIdValidation = validateUserId(id);
@@ -453,8 +494,8 @@ async function handleGetUserSettings(req, res, decoded, startTime, id) {
   let settings = user.settings || {};
 
   // If no user settings, try to get team defaults
-  if (Object.keys(settings).length === 0 && user.team) {
-    const team = await teamsCollection.findOne({ _id: new ObjectId(user.team) });
+  if (Object.keys(settings).length === 0 && user.teamId) {
+    const team = await teamsCollection.findOne({ _id: user.teamId });
     if (team && team.settings && team.settings.defaults) {
       settings = team.settings.defaults;
     }
@@ -496,7 +537,10 @@ async function handleGetUserSettings(req, res, decoded, startTime, id) {
 
 // Handler: Update user settings
 async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
-  const usersCollection = req.usersCollection;
+  // Connect to database
+  const client = await connectDB();
+  const db = client.db('leavebot');
+  const usersCollection = db.collection('users');
 
   // Validate user ID
   const userIdValidation = validateUserId(id);
