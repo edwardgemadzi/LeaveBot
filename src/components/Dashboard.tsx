@@ -20,7 +20,7 @@ interface User {
   id: string
   username: string
   name: string
-  role: 'admin' | 'user'
+  role: 'admin' | 'leader' | 'user'
 }
 
 interface DashboardProps {
@@ -40,8 +40,8 @@ export default function Dashboard({ user, leaves, token }: DashboardProps) {
   }
 
   const stats = useMemo(() => {
-    if (user.role === 'admin') {
-      // Admin sees all leaves statistics
+    if (user.role === 'admin' || user.role === 'leader') {
+      // Admin/Leader sees all team leaves statistics (backend filters by team for leaders)
       const approvedLeaves = leaves.filter(l => l.status === 'approved')
       const workingDaysUsed = approvedLeaves.reduce((sum, leave) => sum + calculateDaysForLeave(leave), 0)
       
@@ -98,7 +98,7 @@ export default function Dashboard({ user, leaves, token }: DashboardProps) {
 
   const recentActivity = useMemo(() => {
     let filteredLeaves = leaves
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'leader') {
       filteredLeaves = leaves.filter(l => l.userId === user.id)
     }
     
@@ -109,12 +109,12 @@ export default function Dashboard({ user, leaves, token }: DashboardProps) {
 
   return (
     <div style={{ padding: '20px' }}>
-      <h2 style={{ marginBottom: '30px', color: '#333' }}>
-        {user.role === 'admin' ? 'Admin Dashboard' : 'My Dashboard'}
-      </h2>
+            <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '4px', color: '#111827' }}>
+        {user.role === 'admin' ? 'Admin Dashboard' : user.role === 'leader' ? 'Team Dashboard' : 'My Dashboard'}
+      </h1>
 
       {/* Leave Balance - Only show for regular users */}
-      {user.role !== 'admin' && token && (
+      {user.role !== 'admin' && user.role !== 'leader' && token && (
         <LeaveBalance userId={user.id} token={token} />
       )}
 
