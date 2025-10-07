@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { LeaveBalance } from './LeaveBalance'
 
 interface Leave {
@@ -27,9 +27,56 @@ interface DashboardProps {
   user: User
   leaves: Leave[]
   token?: string
+  onLeaveUpdate?: () => void
 }
 
-export default function Dashboard({ user, leaves, token }: DashboardProps) {
+export default function Dashboard({ user, leaves, token, onLeaveUpdate }: DashboardProps) {
+  const [processing, setProcessing] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const handleLeaveAction = async (leaveId: string, action: 'approve' | 'reject' | 'delete') => {
+    if (!token) return
+    
+    setProcessing(leaveId)
+    setError('')
+    
+    try {
+      let endpoint = ''
+      let method = ''
+      let body = {}
+      
+      if (action === 'delete') {
+        endpoint = `/api/leaves?id=${leaveId}`
+        method = 'DELETE'
+      } else {
+        endpoint = `/api/leaves/${leaveId}`
+        method = 'PUT'
+        body = { status: action === 'approve' ? 'approved' : 'rejected' }
+      }
+      
+      const res = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: method === 'PUT' || method === 'POST' ? JSON.stringify(body) : undefined
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok && data.success) {
+        if (onLeaveUpdate) onLeaveUpdate()
+      } else {
+        setError(data.error || `Failed to ${action} leave`)
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+    } finally {
+      setProcessing(null)
+    }
+  }
+
   // Helper to calculate working days (falls back to calendar days if not available)
   const calculateDaysForLeave = (leave: Leave) => {
     if (leave.workingDaysCount) return leave.workingDaysCount
@@ -109,9 +156,22 @@ export default function Dashboard({ user, leaves, token }: DashboardProps) {
 
   return (
     <div style={{ padding: '20px' }}>
-            <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '4px', color: '#111827' }}>
+      <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '4px', color: '#111827' }}>
         {user.role === 'admin' ? 'Admin Dashboard' : user.role === 'leader' ? 'Team Dashboard' : 'My Dashboard'}
       </h1>
+
+      {error && (
+        <div style={{
+          padding: '12px',
+          background: '#fee2e2',
+          color: '#991b1b',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          border: '1px solid #fecaca'
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* Leave Balance - Only show for regular users */}
       {user.role !== 'admin' && user.role !== 'leader' && token && (
@@ -267,6 +327,68 @@ export default function Dashboard({ user, leaves, token }: DashboardProps) {
                     }}>
                       {leave.reason.length > 40 ? leave.reason.substring(0, 40) + '...' : leave.reason}
                     </p>
+                    
+                    {/* Admin Actions */}
+                    {user.role === 'admin' && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        {leave.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleLeaveAction(leave._id, 'approve')}
+                              disabled={processing === leave._id}
+                              style={{
+                                padding: '4px 12px',
+                                background: processing === leave._id ? '#9ca3af' : '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: processing === leave._id ? 'not-allowed' : 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '500'
+                              }}
+                            >
+                              ✅ Approve
+                            </button>
+                            <button
+                              onClick={() => handleLeaveAction(leave._id, 'reject')}
+                              disabled={processing === leave._id}
+                              style={{
+                                padding: '4px 12px',
+                                background: processing === leave._id ? '#9ca3af' : '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: processing === leave._id ? 'not-allowed' : 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '500'
+                              }}
+                            >
+                              ❌ Reject
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete this leave request from ${leave.employeeName}?`)) {
+                              handleLeaveAction(leave._id, 'delete')
+                            }
+                          }}
+                          disabled={processing === leave._id}
+                          style={{
+                            padding: '4px 12px',
+                            background: processing === leave._id ? '#9ca3af' : '#6b7280',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: processing === leave._id ? 'not-allowed' : 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '500'
+                          }}
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

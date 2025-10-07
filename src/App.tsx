@@ -462,18 +462,22 @@ function App() {
           icon="📊"
           label="Dashboard"
         />
-        <NavTab 
-          active={currentView === 'calendar'} 
-          onClick={() => setCurrentView('calendar')}
-          icon="📅"
-          label="Calendar"
-        />
-        <NavTab 
-          active={currentView === 'list'} 
-          onClick={() => setCurrentView('list')}
-          icon="📋"
-          label="Leave List"
-        />
+        {user.role !== 'admin' && (
+          <>
+            <NavTab 
+              active={currentView === 'calendar'} 
+              onClick={() => setCurrentView('calendar')}
+              icon="📅"
+              label="Calendar"
+            />
+            <NavTab 
+              active={currentView === 'list'} 
+              onClick={() => setCurrentView('list')}
+              icon="📋"
+              label="Leave List"
+            />
+          </>
+        )}
         {user.role === 'admin' && (
           <NavTab 
             active={currentView === 'teams'} 
@@ -494,10 +498,10 @@ function App() {
 
       {/* View Content */}
       {currentView === 'dashboard' && (
-        <Dashboard user={user} leaves={leaves} token={token} />
+        <Dashboard user={user} leaves={leaves} token={token} onLeaveUpdate={() => loadLeaves()} />
       )}
 
-      {currentView === 'calendar' && (
+      {currentView === 'calendar' && user.role !== 'admin' && (
         <InteractiveCalendar 
           user={user} 
           leaves={leaves}

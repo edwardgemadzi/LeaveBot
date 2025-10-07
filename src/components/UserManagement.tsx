@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { User, Plus, Trash2, Eye, EyeOff, X, Shield, Users as UsersIcon, UserCog } from 'lucide-react'
+import UserProfileModal from './UserProfileModal'
 
 interface User {
   id: string
@@ -24,6 +26,7 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
   const [newPassword, setNewPassword] = useState('')
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [changingPasswordFor, setChangingPasswordFor] = useState<User | null>(null)
+  const [editingUserSettings, setEditingUserSettings] = useState<User | null>(null)
   
   // Add User states
   const [showAddUserModal, setShowAddUserModal] = useState(false)
@@ -379,6 +382,21 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
                     }}
                   >
                     ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => setEditingUserSettings(user)}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#8b5cf6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    ⚙️ Settings
                   </button>
                   <button
                     onClick={() => {
@@ -777,6 +795,20 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
             </div>
           </div>
         </div>
+      )}
+
+      {/* User Settings Modal */}
+      {editingUserSettings && (
+        <UserProfileModal
+          isOpen={true}
+          onClose={() => setEditingUserSettings(null)}
+          user={editingUserSettings}
+          token={token}
+          onSuccess={() => {
+            loadUsers()
+            setEditingUserSettings(null)
+          }}
+        />
       )}
     </div>
   )

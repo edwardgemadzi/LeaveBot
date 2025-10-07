@@ -333,5 +333,59 @@ export default async function handler(req, res) {
     }
   }
 
+  // DELETE - Delete leave request (admin can delete any, users can delete own pending requests)
+  if (req.method === 'DELETE') {
+    const leaveId = req.query.id;
+    if (!leaveId) {
+      return res.status(400).json({ error: 'Leave ID is required' });
+    }
+
+    try {
+      const { ObjectId } = await import('mongodb');
+      const { db } = await import('./shared/mongodb-storage.js').then(m => m.connectToDatabase());
+      const leavesCollection = db.collection('leaves');
+
+      // Fetch the leave request first
+      const leave = await leavesCollection.findOne({ _id: new ObjectId(leaveId) });
+      
+      if (!leave) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+
+      // Check permissions
+      // Admin can delete any leave
+      // Users can only delete their own pending leaves
+      if (auth.user.role !== 'admin') {
+        if (leave.userId !== auth.user.id) {
+          return res.status(403).json({ error: 'Not authorized to delete this leave request' });
+        }
+        if (leave.status !== 'pending') {
+          return res.status(403).json({ error: 'Can only delete pending leave requests' });
+        }
+      }
+
+      const result = await leavesCollection.deleteOne({ _id: new ObjectId(leaveId) });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+
+      logger.info('Leave request deleted', {
+        leaveId,
+        deletedBy: auth.user.id,
+        role: auth.user.role,
+        duration: Date.now() - startTime
+      });
+
+      const duration = Date.now() - startTime;
+      logger.response(req, res, duration);
+
+      return res.json({ success: true, message: 'Leave request deleted successfully' });
+    } catch (err) {
+      logger.error('Error deleting leave request', { error: err.message, leaveId });
+      return res.status(500).json({ error: 'Failed to delete leave request' });
+    }
+  }
+
   return res.status(405).json({ error: 'Method not allowed' });
 }
