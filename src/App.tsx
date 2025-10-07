@@ -33,6 +33,7 @@ function App() {
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
   const [showProfileSettings, setShowProfileSettings] = useState(false)
+  const [showRequestModal, setShowRequestModal] = useState(false)
   const [calculatedDays, setCalculatedDays] = useState<{
     workingDays: number
     calendarDays: number
@@ -306,6 +307,7 @@ function App() {
         setEndDate('')
         setReason('')
         setCalculatedDays(null)
+        setShowRequestModal(false)
         setCurrentView('list')
         loadLeaves()
       } else {
@@ -472,14 +474,6 @@ function App() {
           icon="📋"
           label="Leave List"
         />
-        {user.role === 'user' && (
-          <NavTab 
-            active={currentView === 'form'} 
-            onClick={() => setCurrentView('form')}
-            icon="✏️"
-            label="Request Leave"
-          />
-        )}
         {user.role === 'admin' && (
           <NavTab 
             active={currentView === 'teams'} 
@@ -511,9 +505,10 @@ function App() {
             setStartDate(startDate.toISOString().split('T')[0])
             setEndDate(endDate.toISOString().split('T')[0])
             setEmployeeName(user.name)
-            setCurrentView('form')
+            setShowRequestModal(true)
           }}
           onRefresh={() => loadLeaves()}
+          showToast={info}
         />
       )}
 
@@ -525,127 +520,255 @@ function App() {
         <UserManagement currentUser={user} token={token} />
       )}
 
-      {currentView === 'form' && (
-        <div style={{marginTop:'30px'}}>
-          <h2>Request Leave</h2>
-          <form onSubmit={handleSubmitLeave} style={{border:'1px solid #ddd',padding:'20px',borderRadius:'5px',background:'white'}}>
-            <input 
-              type="text" 
-              placeholder="Employee Name" 
-              value={employeeName}
-              onChange={e=>setEmployeeName(e.target.value)}
-              style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
-              required
-              disabled={loading}
-            />
-            <input 
-              type="date" 
-              placeholder="Start Date" 
-              value={startDate}
-              onChange={e=>setStartDate(e.target.value)}
-              style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
-              required
-              disabled={loading}
-            />
-            <input 
-              type="date" 
-              placeholder="End Date" 
-              value={endDate}
-              onChange={e=>setEndDate(e.target.value)}
-              style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
-              required
-              disabled={loading}
-            />
-            
-            {/* Working Days Display */}
-            {calculatedDays && (
-              <div style={{
-                padding:'15px',
-                margin:'10px 0',
-                background:'#f0fdf4',
-                border:'1px solid #86efac',
-                borderRadius:'5px'
-              }}>
-                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
-                  <span style={{fontSize:'20px',fontWeight:'bold',color:'#059669'}}>
-                    📊 {calculatedDays.workingDays} working day{calculatedDays.workingDays !== 1 ? 's' : ''}
-                  </span>
-                  <span style={{fontSize:'14px',color:'#6b7280'}}>
-                    ({calculatedDays.calendarDays} calendar day{calculatedDays.calendarDays !== 1 ? 's' : ''})
-                  </span>
-                </div>
-                {calculatedDays.shiftPattern && (
-                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                    <span style={{
-                      padding:'4px 10px',
-                      background:'#e0e7ff',
-                      color:'#4338ca',
-                      borderRadius:'12px',
-                      fontSize:'13px',
-                      fontWeight:'500'
-                    }}>
-                      {calculatedDays.shiftPattern === 'regular' ? '📅 Regular' : 
-                       calculatedDays.shiftPattern === '2-2' ? '🔄 2/2' :
-                       calculatedDays.shiftPattern === '5-2' ? '🔄 5/2' : '📅 Custom'}
+      {/* Floating Action Button for Regular Users */}
+      {user.role === 'user' && (
+        <button
+          onClick={() => {
+            setEmployeeName(user.name)
+            setShowRequestModal(true)
+          }}
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '28px',
+            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s ease',
+            zIndex: 1000
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)'
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.6)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+          }}
+          title="Request Leave"
+        >
+          ✏️
+        </button>
+      )}
+
+      {/* Leave Request Modal */}
+      {showRequestModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, color: '#1f2937' }}>✏️ Request Leave</h2>
+              <button
+                onClick={() => {
+                  setShowRequestModal(false)
+                  setEmployeeName('')
+                  setStartDate('')
+                  setEndDate('')
+                  setReason('')
+                  setCalculatedDays(null)
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '5px'
+                }}
+                title="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitLeave}>
+              <input 
+                type="text" 
+                placeholder="Employee Name" 
+                value={employeeName}
+                onChange={e=>setEmployeeName(e.target.value)}
+                style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+                required
+                disabled={loading}
+              />
+              <input 
+                type="date" 
+                placeholder="Start Date" 
+                value={startDate}
+                onChange={e=>setStartDate(e.target.value)}
+                style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+                required
+                disabled={loading}
+              />
+              <input 
+                type="date" 
+                placeholder="End Date" 
+                value={endDate}
+                onChange={e=>setEndDate(e.target.value)}
+                style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+                required
+                disabled={loading}
+              />
+              
+              {/* Working Days Display */}
+              {calculatedDays && (
+                <div style={{
+                  padding:'15px',
+                  margin:'10px 0',
+                  background:'#f0fdf4',
+                  border:'1px solid #86efac',
+                  borderRadius:'5px'
+                }}>
+                  <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
+                    <span style={{fontSize:'20px',fontWeight:'bold',color:'#059669'}}>
+                      📊 {calculatedDays.workingDays} working day{calculatedDays.workingDays !== 1 ? 's' : ''}
                     </span>
-                    {calculatedDays.shiftTime && (
+                    <span style={{fontSize:'14px',color:'#6b7280'}}>
+                      ({calculatedDays.calendarDays} calendar day{calculatedDays.calendarDays !== 1 ? 's' : ''})
+                    </span>
+                  </div>
+                  {calculatedDays.shiftPattern && (
+                    <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                       <span style={{
                         padding:'4px 10px',
-                        background:'#fef3c7',
-                        color:'#92400e',
+                        background:'#e0e7ff',
+                        color:'#4338ca',
                         borderRadius:'12px',
                         fontSize:'13px',
                         fontWeight:'500'
                       }}>
-                        {calculatedDays.shiftTime === 'day' ? '☀️ Day' : '🌙 Night'}
+                        {calculatedDays.shiftPattern === 'regular' ? '📅 Regular' : 
+                         calculatedDays.shiftPattern === '2-2' ? '🔄 2/2' :
+                         calculatedDays.shiftPattern === '5-2' ? '🔄 5/2' : '📅 Custom'}
                       </span>
-                    )}
-                  </div>
-                )}
+                      {calculatedDays.shiftTime && (
+                        <span style={{
+                          padding:'4px 10px',
+                          background:'#fef3c7',
+                          color:'#92400e',
+                          borderRadius:'12px',
+                          fontSize:'13px',
+                          fontWeight:'500'
+                        }}>
+                          {calculatedDays.shiftTime === 'day' ? '☀️ Day' : '🌙 Night'}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {calculatingDays && (
+                <div style={{
+                  padding:'15px',
+                  margin:'10px 0',
+                  background:'#f3f4f6',
+                  border:'1px solid #d1d5db',
+                  borderRadius:'5px',
+                  color:'#6b7280',
+                  fontSize:'14px'
+                }}>
+                  ⏳ Calculating working days...
+                </div>
+              )}
+              {calculatedDays?.warning && (
+                <div style={{
+                  padding:'15px',
+                  margin:'10px 0',
+                  background:'#fef3c7',
+                  border:'1px solid #fbbf24',
+                  borderRadius:'5px',
+                  color:'#92400e',
+                  fontSize:'14px'
+                }}>
+                  ⚠️ {calculatedDays.warning}
+                </div>
+              )}
+              
+              <textarea 
+                placeholder="Reason (optional)" 
+                value={reason}
+                onChange={e=>setReason(e.target.value)}
+                style={{width:'100%',padding:'10px',margin:'10px 0',minHeight:'80px',borderRadius:'5px',border:'1px solid #ddd'}}
+                disabled={loading}
+              />
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button 
+                  type="submit" 
+                  style={{
+                    flex: 1,
+                    padding:'12px 20px',
+                    background: loading ? '#6c757d' : '#28a745',
+                    color:'white',
+                    border:'none',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    borderRadius:'5px',
+                    fontSize: '16px',
+                    fontWeight: '600'
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? 'Submitting...' : 'Submit Request'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowRequestModal(false)
+                    setEmployeeName('')
+                    setStartDate('')
+                    setEndDate('')
+                    setReason('')
+                    setCalculatedDays(null)
+                  }}
+                  style={{
+                    padding:'12px 20px',
+                    background:'#6c757d',
+                    color:'white',
+                    border:'none',
+                    cursor:'pointer',
+                    borderRadius:'5px',
+                    fontSize: '16px'
+                  }}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
               </div>
-            )}
-            {calculatingDays && (
-              <div style={{
-                padding:'15px',
-                margin:'10px 0',
-                background:'#f3f4f6',
-                border:'1px solid #d1d5db',
-                borderRadius:'5px',
-                color:'#6b7280',
-                fontSize:'14px'
-              }}>
-                ⏳ Calculating working days...
-              </div>
-            )}
-            {calculatedDays?.warning && (
-              <div style={{
-                padding:'15px',
-                margin:'10px 0',
-                background:'#fef3c7',
-                border:'1px solid #fbbf24',
-                borderRadius:'5px',
-                color:'#92400e',
-                fontSize:'14px'
-              }}>
-                ⚠️ {calculatedDays.warning}
-              </div>
-            )}
-            
-            <textarea 
-              placeholder="Reason (optional)" 
-              value={reason}
-              onChange={e=>setReason(e.target.value)}
-              style={{width:'100%',padding:'10px',margin:'10px 0',minHeight:'80px',borderRadius:'5px',border:'1px solid #ddd'}}
-              disabled={loading}
-            />
-            <button 
-              type="submit" 
-              style={{padding:'10px 20px',background:loading?'#6c757d':'#28a745',color:'white',border:'none',cursor:loading?'not-allowed':'pointer',borderRadius:'5px'}}
-              disabled={loading}
-            >
-              {loading ? 'Submitting...' : 'Submit Request'}
-            </button>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
@@ -672,7 +795,10 @@ function App() {
                 description={user.role === 'user' ? "Submit your first leave request to get started. Your team and admin will be notified for approval." : "No leave requests from team members yet."}
                 action={user.role === 'user' ? {
                   label: '✏️ Request Leave',
-                  onClick: () => setCurrentView('form')
+                  onClick: () => {
+                    setEmployeeName(user.name)
+                    setShowRequestModal(true)
+                  }
                 } : undefined}
               />
             ) : (

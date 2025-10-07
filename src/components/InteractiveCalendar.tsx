@@ -41,6 +41,7 @@ interface LeaveCalendarProps {
   leaves: Leave[]
   onRequestLeave?: (startDate: Date, endDate: Date) => void
   onRefresh?: () => void
+  showToast?: (message: string) => void
 }
 
 interface CalendarEvent {
@@ -51,7 +52,7 @@ interface CalendarEvent {
   resource: Leave
 }
 
-export default function LeaveCalendar({ user, leaves, onRequestLeave, onRefresh }: LeaveCalendarProps) {
+export default function LeaveCalendar({ user, leaves, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
   const [view, setView] = useState<string>('month')
   const [showTeamOnly, setShowTeamOnly] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
@@ -91,23 +92,42 @@ export default function LeaveCalendar({ user, leaves, onRequestLeave, onRefresh 
     })
   }, [leaves, user, showTeamOnly])
 
-  const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
-    setSelectedSlot(slotInfo)
-    // Show confirmation or open request form
-    if (onRequestLeave && confirm(`Request leave from ${format(slotInfo.start, 'MMM dd')} to ${format(slotInfo.end, 'MMM dd')}?`)) {
-      onRequestLeave(slotInfo.start, slotInfo.end)
-      setSelectedSlot(null)
+  const handleSelectSlot = (slotInfo: any) => {
+    // Only allow regular users to request leaves from calendar
+    if (user.role !== 'user') {
+      if (showToast) {
+        showToast('Only regular users can request leaves. Admins and leaders manage team members.')
+      }
+      return
+    }
+    
+    if (onRequestLeave) {
+      const start = slotInfo.start
+      const end = slotInfo.end
+      
+      if (showToast) {
+        showToast(`Selected: ${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')}. Opening request form...`)
+      }
+      
+      onRequestLeave(start, end)
     }
   }
 
   const handleSelectEvent = (event: CalendarEvent) => {
     const leave = event.resource
-    alert(
-      `${leave.employeeName}\n` +
-      `${format(new Date(leave.startDate), 'MMM dd, yyyy')} - ${format(new Date(leave.endDate), 'MMM dd, yyyy')}\n` +
-      `Status: ${leave.status}\n` +
-      `${leave.reason ? `Reason: ${leave.reason}` : ''}`
-    )
+    const message = `${leave.employeeName} • ${format(new Date(leave.startDate), 'MMM dd, yyyy')} - ${format(new Date(leave.endDate), 'MMM dd, yyyy')} • ${leave.status.toUpperCase()}${leave.reason ? ` • ${leave.reason}` : ''}`
+    
+    if (showToast) {
+      showToast(message)
+    } else {
+      // Fallback to alert if showToast not provided
+      alert(
+        `${leave.employeeName}\n` +
+        `${format(new Date(leave.startDate), 'MMM dd, yyyy')} - ${format(new Date(leave.endDate), 'MMM dd, yyyy')}\n` +
+        `Status: ${leave.status}\n` +
+        `${leave.reason ? `Reason: ${leave.reason}` : ''}`
+      )
+    }
   }
 
   const eventStyleGetter = (event: CalendarEvent) => {
@@ -142,7 +162,7 @@ export default function LeaveCalendar({ user, leaves, onRequestLeave, onRefresh 
             {user.role === 'admin' ? 'Team Leave Calendar' : 'Leave Calendar'}
           </h2>
           <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-            Click and drag to select dates for a new leave request
+            {user.role === 'user' ? 'Click and drag on the calendar to select dates for a new leave request' : 'View team leave schedules and manage approvals'}
           </p>
         </div>
         
