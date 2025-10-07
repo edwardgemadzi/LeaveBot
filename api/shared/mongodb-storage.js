@@ -218,11 +218,11 @@ export async function getAllLeaves(userId = null, role = 'user') {
         return await leavesCollection.find({ userId }).sort({ createdAt: -1 }).toArray();
       }
       
-      // Get all users in the leader's team
+      // Get all users in the leader's team (including the leader themselves)
       const teamMembers = await usersCollection.find({ teamId: team._id }).toArray();
       const teamMemberIds = teamMembers.map(m => m._id.toString());
       
-      // Return leaves for team members only
+      // Return leaves for all team members (userId is stored as string in leaves collection)
       return await leavesCollection.find({ userId: { $in: teamMemberIds } }).sort({ createdAt: -1 }).toArray();
     }
     

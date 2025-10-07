@@ -445,22 +445,25 @@ function App() {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
         <h1>LeaveBot - Welcome {user.name}!</h1>
         <div style={{display:'flex',gap:'10px'}}>
-          <button 
-            onClick={() => setShowProfileSettings(true)} 
-            style={{
-              padding:'10px 20px',
-              background:'#3b82f6',
-              color:'white',
-              border:'none',
-              cursor:'pointer',
-              borderRadius:'5px',
-              display:'flex',
-              alignItems:'center',
-              gap:'6px'
-            }}
-          >
-            ⚙️ My Settings
-          </button>
+          {/* Only show My Settings for regular users */}
+          {user.role === 'user' && (
+            <button 
+              onClick={() => setShowProfileSettings(true)} 
+              style={{
+                padding:'10px 20px',
+                background:'#3b82f6',
+                color:'white',
+                border:'none',
+                cursor:'pointer',
+                borderRadius:'5px',
+                display:'flex',
+                alignItems:'center',
+                gap:'6px'
+              }}
+            >
+              ⚙️ My Settings
+            </button>
+          )}
           <button onClick={handleLogout} style={{padding:'10px 20px',background:'#dc3545',color:'white',border:'none',cursor:'pointer',borderRadius:'5px'}}>
             Logout
           </button>

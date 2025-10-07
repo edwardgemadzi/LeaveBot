@@ -86,18 +86,9 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
     
     const { shiftPattern, workingDays } = userSettings
     
-    // Get day of week (0 = Sunday, 1 = Monday, etc.)
-    const dayOfWeek = date.getDay()
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const dayName = dayNames[dayOfWeek] as keyof typeof workingDays
-    
-    // For regular pattern, just check working days
-    if (shiftPattern.type === 'regular') {
-      return workingDays[dayName] || false
-    }
-    
-    // For rotation patterns (2-2, 3-3, 4-4, 5-5), calculate based on reference date
-    if (shiftPattern.referenceDate) {
+    // For rotation patterns (2-2, 3-3, 4-4, 5-5), ONLY check the cycle, NOT weekdays
+    // These patterns work ANY day of the week, just rotating on/off cycles
+    if (shiftPattern.type !== 'regular' && shiftPattern.referenceDate) {
       const referenceDate = new Date(shiftPattern.referenceDate)
       const daysSinceReference = Math.floor((date.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24))
       
@@ -110,14 +101,20 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
         const positionInCycle = ((daysSinceReference % cycleLength) + cycleLength) % cycleLength
         
         // First part of cycle is working days
-        const isInWorkingPeriod = positionInCycle < workDays
-        
-        // Also check if it's a valid working day of the week
-        return isInWorkingPeriod && (workingDays[dayName] || false)
+        return positionInCycle < workDays
       }
     }
     
-    return workingDays[dayName] || false
+    // For regular pattern, check working days configuration
+    if (shiftPattern.type === 'regular') {
+      const dayOfWeek = date.getDay()
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+      const dayName = dayNames[dayOfWeek] as keyof typeof workingDays
+      return workingDays[dayName] || false
+    }
+    
+    // Fallback: allow the day
+    return true
   }
 
   const events: CalendarEvent[] = useMemo(() => {

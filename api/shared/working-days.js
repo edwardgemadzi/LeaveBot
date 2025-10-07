@@ -40,36 +40,45 @@ export function calculateWorkingDays(startDate, endDate, shiftPattern, workingDa
 /**
  * Check if a specific date is a working day
  * @param {Date} date - Date to check
- * @param {Object} shiftPattern - Shift pattern configuration
- * @param {Object} workingDaysConfig - Working days configuration
+ * @param {Object} shiftPattern - Shift pattern configuration {type, referenceDate}
+ * @param {Object} workingDaysConfig - Working days configuration {monday, tuesday, etc.}
  * @returns {boolean} True if it's a working day
  */
 export function isWorkingDay(date, shiftPattern, workingDaysConfig) {
   const checkDate = new Date(date);
   checkDate.setHours(0, 0, 0, 0);
   
-  // Check if date falls on custom off days (e.g., weekends)
-  if (workingDaysConfig?.customOffDays?.length > 0) {
-    const dayOfWeek = checkDate.getDay(); // 0 = Sunday, 6 = Saturday
-    if (workingDaysConfig.customOffDays.includes(dayOfWeek)) {
-      return false;
+  // For rotation patterns (2-2, 3-3, 4-4, 5-5), ONLY check the cycle
+  // These patterns work ANY day of the week, just rotating on/off cycles
+  if (shiftPattern.type !== 'regular') {
+    // Parse pattern type (e.g., "2-2" -> 2 work days, 2 off days)
+    const match = shiftPattern.type.match(/^(\d+)-(\d+)$/);
+    if (match && shiftPattern.referenceDate) {
+      const workDays = parseInt(match[1]);
+      const offDays = parseInt(match[2]);
+      const cycleLength = workDays + offDays;
+      
+      const refDate = new Date(shiftPattern.referenceDate);
+      refDate.setHours(0, 0, 0, 0);
+      
+      const daysSinceReference = Math.floor((checkDate - refDate) / (1000 * 60 * 60 * 24));
+      const positionInCycle = ((daysSinceReference % cycleLength) + cycleLength) % cycleLength;
+      
+      // First part of cycle is working days
+      return positionInCycle < workDays;
     }
   }
   
-  // Handle different shift patterns
-  switch (shiftPattern.type) {
-    case 'regular':
-      return isRegularWorkDay(checkDate, workingDaysConfig);
-    
-    case '2-2':
-    case '5-2':
-    case 'custom':
-      return isCyclicWorkDay(checkDate, shiftPattern);
-    
-    default:
-      // Default to Monday-Friday
-      return isRegularWorkDay(checkDate, workingDaysConfig);
+  // For regular pattern, check working days configuration
+  if (shiftPattern.type === 'regular' && workingDaysConfig) {
+    const dayOfWeek = checkDate.getDay();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[dayOfWeek];
+    return workingDaysConfig[dayName] === true;
   }
+  
+  // Fallback
+  return true;
 }
 
 /**
