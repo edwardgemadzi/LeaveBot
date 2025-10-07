@@ -328,8 +328,8 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
                       {leave.reason.length > 40 ? leave.reason.substring(0, 40) + '...' : leave.reason}
                     </p>
                     
-                    {/* Admin Actions */}
-                    {user.role === 'admin' && (
+                    {/* Admin/Leader Actions */}
+                    {(user.role === 'admin' || user.role === 'leader') && (
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                         {leave.status === 'pending' && (
                           <>

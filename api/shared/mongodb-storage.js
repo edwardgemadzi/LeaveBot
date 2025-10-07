@@ -213,14 +213,23 @@ export async function getAllLeaves(userId = null, role = 'user') {
     if (role === 'leader') {
       // Find the team where this user is the leader
       const team = await teamsCollection.findOne({ leaderId: new ObjectId(userId) });
+      
       if (!team) {
         // Leader has no team, show their own leaves as fallback
+        logger.warn('Leader has no assigned team', { userId, role });
         return await leavesCollection.find({ userId }).sort({ createdAt: -1 }).toArray();
       }
       
       // Get all users in the leader's team (including the leader themselves)
       const teamMembers = await usersCollection.find({ teamId: team._id }).toArray();
       const teamMemberIds = teamMembers.map(m => m._id.toString());
+      
+      logger.info('Leader viewing team leaves', { 
+        userId, 
+        teamId: team._id.toString(), 
+        teamName: team.name,
+        teamMemberCount: teamMembers.length 
+      });
       
       // Return leaves for all team members (userId is stored as string in leaves collection)
       return await leavesCollection.find({ userId: { $in: teamMemberIds } }).sort({ createdAt: -1 }).toArray();
