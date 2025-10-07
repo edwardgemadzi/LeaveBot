@@ -220,8 +220,14 @@ export async function getAllLeaves(userId = null, role = 'user') {
         return await leavesCollection.find({ userId }).sort({ createdAt: -1 }).toArray();
       }
       
-      // Get all users in the leader's team (including the leader themselves)
-      const teamMembers = await usersCollection.find({ teamId: team._id }).toArray();
+      // Get all users in the leader's team
+      // Include users with teamId matching AND the leader themselves (who may not have teamId set)
+      const teamMembers = await usersCollection.find({ 
+        $or: [
+          { teamId: team._id },
+          { _id: new ObjectId(userId) }  // Include the leader
+        ]
+      }).toArray();
       const teamMemberIds = teamMembers.map(m => m._id.toString());
       
       logger.info('Leader viewing team leaves', { 
