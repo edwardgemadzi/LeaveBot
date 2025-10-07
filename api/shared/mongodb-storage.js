@@ -222,6 +222,7 @@ export async function getAllLeaves(userId = null, role = 'user') {
       
       // Get all users in the leader's team
       // Include users with teamId matching AND the leader themselves (who may not have teamId set)
+      // Version: 2025-10-07-fix (includes leader in query)
       const teamMembers = await usersCollection.find({ 
         $or: [
           { teamId: team._id },
@@ -230,15 +231,23 @@ export async function getAllLeaves(userId = null, role = 'user') {
       }).toArray();
       const teamMemberIds = teamMembers.map(m => m._id.toString());
       
-      logger.info('Leader viewing team leaves', { 
+      logger.info('Leader viewing team leaves [v2025-10-07-fix]', { 
         userId, 
         teamId: team._id.toString(), 
         teamName: team.name,
-        teamMemberCount: teamMembers.length 
+        teamMemberCount: teamMembers.length,
+        teamMemberIds: teamMemberIds
       });
       
       // Return leaves for all team members (userId is stored as string in leaves collection)
-      return await leavesCollection.find({ userId: { $in: teamMemberIds } }).sort({ createdAt: -1 }).toArray();
+      const teamLeaves = await leavesCollection.find({ userId: { $in: teamMemberIds } }).sort({ createdAt: -1 }).toArray();
+      
+      logger.info('Returning team leaves', { 
+        count: teamLeaves.length,
+        leaveIds: teamLeaves.map(l => l._id.toString())
+      });
+      
+      return teamLeaves;
     }
     
     // Regular users only see their own leaves
