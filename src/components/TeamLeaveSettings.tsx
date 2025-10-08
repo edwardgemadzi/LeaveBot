@@ -10,6 +10,7 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [teamId, setTeamId] = useState<string | null>(null)
   const [teamSettings, setTeamSettings] = useState({
     annualLeaveDays: 21,
     maxConsecutiveDays: 14,
@@ -19,42 +20,72 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
   })
 
   useEffect(() => {
-    loadTeamSettings()
+    loadTeamAndSettings()
   }, [])
 
-  const loadTeamSettings = async () => {
+  const loadTeamAndSettings = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/teams/settings', {
+      // First, get the leader's team
+      const teamsRes = await fetch('/api/teams', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
       
-      if (!res.ok) {
-        console.error('Failed to load settings:', res.status, res.statusText)
+      if (!teamsRes.ok) {
+        console.error('Failed to load team:', teamsRes.status)
+        setError('Failed to load your team information')
         return
       }
       
-      const data = await res.json()
+      const teamsData = await teamsRes.json()
+      const leaderTeam = Array.isArray(teamsData) ? teamsData[0] : teamsData.teams?.[0]
       
-      if (res.ok && data.success) {
-        setTeamSettings(data.settings || teamSettings)
+      if (!leaderTeam) {
+        setError('You are not assigned to any team')
+        return
+      }
+      
+      setTeamId(leaderTeam._id)
+      
+      // Now load the team settings
+      const settingsRes = await fetch(`/api/teams?id=${leaderTeam._id}&action=settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!settingsRes.ok) {
+        console.error('Failed to load settings:', settingsRes.status, settingsRes.statusText)
+        return
+      }
+      
+      const settingsData = await settingsRes.json()
+      
+      if (settingsData.settings) {
+        setTeamSettings(settingsData.settings)
       }
     } catch (err) {
       console.error('Failed to load team settings:', err)
+      setError('Failed to load team settings')
     } finally {
       setLoading(false)
     }
   }
 
   const handleSave = async () => {
+    if (!teamId) {
+      setError('Team ID not found')
+      return
+    }
+    
     setSaving(true)
     setError('')
     setSuccess('')
     
     try {
-      const res = await fetch('/api/teams/settings', {
+      const res = await fetch(`/api/teams?id=${teamId}&action=settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -76,7 +107,7 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
       
       const data = await res.json()
       
-      if (data.success) {
+      if (data.message || data.success) {
         setSuccess('Team leave settings saved successfully!')
         setTimeout(() => setSuccess(''), 3000)
       } else {
