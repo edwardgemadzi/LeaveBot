@@ -240,9 +240,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    // Admins and leaders cannot request leaves - they only manage team members
-    if (auth.user.role === 'admin' || auth.user.role === 'leader') {
-      return res.status(403).json({ error: 'Admins and leaders cannot request leaves. This feature is only for team members.' });
+    // Note: Leaders can request leaves on behalf of their team members
+    // Only admins are restricted from requesting leaves
+    if (auth.user.role === 'admin') {
+      return res.status(403).json({ error: 'Admins cannot request leaves. This feature is only for team members and leaders.' });
     }
     
     // Validate input
@@ -252,7 +253,7 @@ export default async function handler(req, res) {
     }
     
     const { employeeName, startDate, endDate, reason } = validation.data;
-    const { workingDaysCount, calendarDaysCount, shiftPattern, shiftTime } = req.body;
+    const { workingDaysCount, calendarDaysCount, shiftPattern, shiftTime, leaveType } = req.body;
     
     const leaveData = {
       userId: auth.user.id,
@@ -261,6 +262,7 @@ export default async function handler(req, res) {
       startDate,
       endDate,
       reason,
+      leaveType: leaveType ? String(leaveType) : 'other',
       // Include calculated working days if provided
       ...(workingDaysCount !== undefined && { workingDaysCount: Number(workingDaysCount) }),
       ...(calendarDaysCount !== undefined && { calendarDaysCount: Number(calendarDaysCount) }),

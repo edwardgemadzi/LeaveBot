@@ -9,6 +9,11 @@ interface User {
   name: string
   role: 'admin' | 'leader' | 'user'
   createdAt: string
+  leaveBalance?: {
+    total: number
+    used: number
+    remaining: number
+  }
 }
 
 interface UserManagementProps {
@@ -61,6 +66,8 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
 
       if (data.success) {
         setUsers(data.users)
+        // Load leave balances for each user
+        await loadLeaveBalances(data.users)
       } else {
         setError(data.error || 'Failed to load users')
       }
@@ -68,6 +75,46 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
       setError('Network error. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadLeaveBalances(userList: User[]) {
+    try {
+      // Fetch leaves for all users
+      const res = await fetch('/api/leaves', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await res.json()
+      
+      if (res.ok && data.leaves) {
+        // Calculate balance for each user
+        const usersWithBalance = userList.map(user => {
+          const userLeaves = data.leaves.filter((leave: any) => 
+            leave.userId === user.id && leave.status === 'approved'
+          )
+          
+          const usedDays = userLeaves.reduce((sum: number, leave: any) => 
+            sum + (leave.workingDaysCount || 0), 0
+          )
+          
+          const totalDays = 21 // Default, can be from team settings
+          
+          return {
+            ...user,
+            leaveBalance: {
+              total: totalDays,
+              used: usedDays,
+              remaining: totalDays - usedDays
+            }
+          }
+        })
+        
+        setUsers(usersWithBalance)
+      }
+    } catch (err) {
+      console.error('Failed to load leave balances:', err)
     }
   }
 
@@ -360,6 +407,58 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
               <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '15px' }}>
                 Joined {new Date(user.createdAt).toLocaleDateString()}
               </p>
+
+              {/* Leave Balance - Only show for regular users */}
+              {user.role === 'user' && user.leaveBalance && (
+                <div style={{
+                  padding: '12px',
+                  background: user.leaveBalance.remaining < 5 ? '#fef2f2' : '#f0fdf4',
+                  border: `1px solid ${user.leaveBalance.remaining < 5 ? '#fecaca' : '#bbf7d0'}`,
+                  borderRadius: '8px',
+                  marginBottom: '15px'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '8px'
+                  }}>
+                    <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '600' }}>
+                      Leave Balance
+                    </span>
+                    <span style={{ 
+                      fontSize: '18px', 
+                      fontWeight: 'bold',
+                      color: user.leaveBalance.remaining < 5 ? '#dc2626' : '#059669'
+                    }}>
+                      {user.leaveBalance.remaining}
+                    </span>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '15px', 
+                    fontSize: '12px',
+                    color: '#6b7280'
+                  }}>
+                    <div>
+                      <span style={{ fontWeight: '500' }}>Total:</span> {user.leaveBalance.total}
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: '500' }}>Used:</span> {user.leaveBalance.used}
+                    </div>
+                  </div>
+                  {user.leaveBalance.remaining < 5 && (
+                    <div style={{ 
+                      marginTop: '8px', 
+                      fontSize: '11px', 
+                      color: '#dc2626',
+                      fontWeight: '500'
+                    }}>
+                      ⚠️ Low balance
+                    </div>
+                  )}
+                </div>
+              )}
 
               {canManage && (
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

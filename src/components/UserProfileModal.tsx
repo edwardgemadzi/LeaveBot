@@ -178,7 +178,7 @@ export default function UserProfileModal({ isOpen, onClose, user, token, onSucce
           {[
             { id: 'shift', label: '🔄 My Shift Pattern' },
             { id: 'time', label: '⏰ My Shift Time' },
-            { id: 'days', label: '📅 My Working Days' }
+            { id: 'days', label: '📅 Shift Cycle Start' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -387,46 +387,61 @@ export default function UserProfileModal({ isOpen, onClose, user, token, onSucce
           {activeTab === 'days' && (
             <div>
               <h3 style={{ marginTop: 0, fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>
-                Configure Your Working Days
+                Configure Your Shift Cycle
               </h3>
               <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px' }}>
-                Select which days you typically work. This affects how your leave days are calculated.
+                Set the reference date for your shift rotation. This determines when your shift cycle starts (e.g., first day back after rotation).
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  { key: 'monday', label: 'Monday' },
-                  { key: 'tuesday', label: 'Tuesday' },
-                  { key: 'wednesday', label: 'Wednesday' },
-                  { key: 'thursday', label: 'Thursday' },
-                  { key: 'friday', label: 'Friday' },
-                  { key: 'saturday', label: 'Saturday' },
-                  { key: 'sunday', label: 'Sunday' }
-                ].map(day => (
-                  <label
-                    key={day.key}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '12px 15px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      background: settings.workingDays[day.key as keyof typeof settings.workingDays] ? '#f0fdf4' : 'white',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={settings.workingDays[day.key as keyof typeof settings.workingDays]}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        workingDays: { ...settings.workingDays, [day.key]: e.target.checked }
-                      })}
-                      style={{ marginRight: '12px', width: '18px', height: '18px' }}
-                    />
-                    <span style={{ fontWeight: '500', fontSize: '15px' }}>{day.label}</span>
-                  </label>
-                ))}
+              
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontWeight: '600',
+                  marginBottom: '8px',
+                  color: '#374151'
+                }}>
+                  📅 Next First Day of Shift
+                </label>
+                <input
+                  type="date"
+                  value={settings.shiftPattern.referenceDate || ''}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    shiftPattern: {
+                      ...settings.shiftPattern,
+                      referenceDate: e.target.value
+                    }
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '15px'
+                  }}
+                />
+                <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
+                  💡 This date is used as the starting point for calculating your shift rotation pattern (e.g., 2-2, 3-3, etc.)
+                </p>
+              </div>
+
+              {/* Info Box */}
+              <div style={{
+                marginTop: '20px',
+                padding: '15px',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px'
+              }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#1e40af', fontSize: '14px' }}>
+                  ℹ️ How it works
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: '20px', color: '#1e40af', fontSize: '13px', lineHeight: '1.6' }}>
+                  <li>Set this to the first day you'll be working in your rotation</li>
+                  <li>For regular patterns: This isn't needed</li>
+                  <li>For rotation patterns (2-2, 3-3, etc.): The system will calculate all your working days from this date</li>
+                  <li>Example: If you work 2-2 and set this to Oct 8, you work Oct 8-9, off Oct 10-11, work Oct 12-13, and so on</li>
+                </ul>
               </div>
             </div>
           )}

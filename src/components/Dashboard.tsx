@@ -7,6 +7,7 @@ interface Leave {
   userId: string
   startDate: string
   endDate: string
+  leaveType?: string
   reason: string
   status: 'pending' | 'approved' | 'rejected'
   createdAt: string
@@ -33,6 +34,26 @@ interface DashboardProps {
 export default function Dashboard({ user, leaves, token, onLeaveUpdate }: DashboardProps) {
   const [processing, setProcessing] = useState<string | null>(null)
   const [error, setError] = useState('')
+
+  // Helper to format leave type with emoji
+  const formatLeaveType = (leaveType?: string) => {
+    if (!leaveType) return '📝 Other'
+    
+    const types: Record<string, string> = {
+      vacation: '🏖️ Vacation',
+      sick: '🤒 Sick Leave',
+      personal: '🏠 Personal',
+      study: '📚 Study Leave',
+      maternity: '👶 Maternity',
+      paternity: '👨‍👶 Paternity',
+      bereavement: '🕊️ Bereavement',
+      emergency: '🚨 Emergency',
+      unpaid: '💼 Unpaid',
+      other: '📝 Other'
+    }
+    
+    return types[leaveType] || '📝 Other'
+  }
 
   const handleLeaveAction = async (leaveId: string, action: 'approve' | 'reject' | 'delete') => {
     if (!token) return
@@ -264,13 +285,18 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
                         {new Date(leave.startDate).toLocaleDateString()}
                       </span>
                     </div>
-                    <p style={{
-                      fontSize: '13px',
-                      color: '#6b7280',
-                      margin: '4px 0 0 0'
-                    }}>
-                      {leave.reason.length > 50 ? leave.reason.substring(0, 50) + '...' : leave.reason}
-                    </p>
+                    <div style={{ fontSize: '12px', color: '#059669', fontWeight: '600', marginBottom: '2px' }}>
+                      {formatLeaveType(leave.leaveType)}
+                    </div>
+                    {leave.reason && (
+                      <p style={{
+                        fontSize: '13px',
+                        color: '#6b7280',
+                        margin: '4px 0 0 0'
+                      }}>
+                        {leave.reason.length > 50 ? leave.reason.substring(0, 50) + '...' : leave.reason}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -320,13 +346,18 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
                     }}>
                       {new Date(leave.startDate).toLocaleDateString()} - {new Date(leave.endDate).toLocaleDateString()}
                     </p>
-                    <p style={{
-                      fontSize: '12px',
-                      color: '#9ca3af',
-                      margin: '4px 0 0 0'
-                    }}>
-                      {leave.reason.length > 40 ? leave.reason.substring(0, 40) + '...' : leave.reason}
-                    </p>
+                    <div style={{ fontSize: '12px', color: '#059669', fontWeight: '600', margin: '4px 0' }}>
+                      {formatLeaveType(leave.leaveType)}
+                    </div>
+                    {leave.reason && (
+                      <p style={{
+                        fontSize: '12px',
+                        color: '#9ca3af',
+                        margin: '4px 0 0 0'
+                      }}>
+                        {leave.reason.length > 40 ? leave.reason.substring(0, 40) + '...' : leave.reason}
+                      </p>
+                    )}
                     
                     {/* Admin/Leader Actions */}
                     {(user.role === 'admin' || user.role === 'leader') && (

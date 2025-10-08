@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard'
 import InteractiveCalendar from './components/InteractiveCalendar'
 import UserManagement from './components/UserManagement'
 import TeamManagement from './components/TeamManagement'
+import TeamLeaveSettings from './components/TeamLeaveSettings'
 import UserProfileModal from './components/UserProfileModal'
 import { ToastContainer } from './components/Toast'
 import { useToast } from './hooks/useToast'
@@ -11,7 +12,7 @@ import { EmptyState } from './components/EmptyState'
 import { LeaveCardSkeleton } from './components/LoadingSkeleton'
 import { SearchFilter } from './components/SearchFilter'
 
-type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams'
+type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams' | 'team-settings'
 
 function App() {
   const { toasts, success, error: showError, info, closeToast } = useToast()
@@ -25,6 +26,7 @@ function App() {
   const [employeeName, setEmployeeName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [leaveType, setLeaveType] = useState('')
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -327,7 +329,8 @@ function App() {
         body: JSON.stringify({ 
           employeeName, 
           startDate, 
-          endDate, 
+          endDate,
+          leaveType,
           reason,
           workingDaysCount: calculatedDays?.workingDays,
           calendarDaysCount: calculatedDays?.calendarDays,
@@ -348,6 +351,7 @@ function App() {
         setEmployeeName('')
         setStartDate('')
         setEndDate('')
+        setLeaveType('')
         setReason('')
         setCalculatedDays(null)
         setShowRequestModal(false)
@@ -540,6 +544,14 @@ function App() {
             label="Team Management"
           />
         )}
+        {user.role === 'leader' && (
+          <NavTab 
+            active={currentView === 'team-settings'} 
+            onClick={() => setCurrentView('team-settings')}
+            icon="⚙️"
+            label="Team Settings"
+          />
+        )}
       </div>
 
       {/* View Content */}
@@ -577,6 +589,10 @@ function App() {
 
       {currentView === 'team' && (user.role === 'admin' || user.role === 'leader') && (
         <UserManagement currentUser={user} token={token} />
+      )}
+
+      {currentView === 'team-settings' && user.role === 'leader' && (
+        <TeamLeaveSettings user={user} token={token} />
       )}
 
       {/* Floating Action Button for Regular Users */}
@@ -659,6 +675,7 @@ function App() {
                   setEmployeeName('')
                   setStartDate('')
                   setEndDate('')
+                  setLeaveType('')
                   setReason('')
                   setCalculatedDays(null)
                 }}
@@ -797,11 +814,33 @@ function App() {
                 </div>
               )}
               
+              {/* Leave Type Dropdown */}
+              <select
+                value={leaveType}
+                onChange={e => setLeaveType(e.target.value)}
+                style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd',fontSize:'14px'}}
+                required
+                disabled={loading}
+              >
+                <option value="">Select Leave Type</option>
+                <option value="vacation">🏖️ Vacation</option>
+                <option value="sick">🤒 Sick Leave</option>
+                <option value="personal">🏠 Personal</option>
+                <option value="study">📚 Study Leave</option>
+                <option value="maternity">👶 Maternity Leave</option>
+                <option value="paternity">👨‍👶 Paternity Leave</option>
+                <option value="bereavement">🕊️ Bereavement</option>
+                <option value="emergency">🚨 Emergency</option>
+                <option value="unpaid">💼 Unpaid Leave</option>
+                <option value="other">📝 Other</option>
+              </select>
+              
+              {/* Additional Notes (Optional) */}
               <textarea 
-                placeholder="Reason (optional)" 
+                placeholder="Additional notes (optional)" 
                 value={reason}
                 onChange={e=>setReason(e.target.value)}
-                style={{width:'100%',padding:'10px',margin:'10px 0',minHeight:'80px',borderRadius:'5px',border:'1px solid #ddd'}}
+                style={{width:'100%',padding:'10px',margin:'10px 0',minHeight:'80px',borderRadius:'5px',border:'1px solid #ddd',fontSize:'14px'}}
                 disabled={loading}
               />
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
