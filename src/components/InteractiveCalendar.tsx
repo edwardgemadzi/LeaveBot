@@ -77,7 +77,8 @@ interface CalendarEvent {
 
 export default function LeaveCalendar({ user, leaves, userSettings, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
   const [view, setView] = useState<string>('month')
-  const [showTeamOnly, setShowTeamOnly] = useState(false)
+  // For leaders, default to showing team leaves; others start with own leaves only
+  const [showTeamOnly, setShowTeamOnly] = useState(user.role === 'leader')
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
 
   // Helper: Check if a date is a working day based on user's shift pattern
@@ -262,7 +263,8 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {(user.role === 'leader' || (user.role === 'user' && user.teamId)) && (
+          {/* Only show toggle for regular users in a team - leaders always see team leaves */}
+          {user.role === 'user' && user.teamId && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
