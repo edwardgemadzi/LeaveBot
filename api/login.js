@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, getUserByUsername, initializeAdmin } from './shared/mongodb-storage.js';
-import { logger } from './shared/logger.js';
-import { validateUsername, validatePassword } from './shared/validators.js';
+import { JWT_SECRET, getUserByUsername, initializeAdmin } from '../lib/shared/mongodb-storage.js';
+import { logger } from '../lib/shared/logger.js';
+import { validateUsername, validatePassword } from '../lib/shared/validators.js';
 
 // Initialize admin on cold start
 initializeAdmin();

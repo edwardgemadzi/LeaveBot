@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { MongoClient, ObjectId } from 'mongodb';
-import { rateLimiters } from './shared/rate-limiter.js';
-import { logger } from './shared/logger.js';
-import { validateUsername, validatePassword, validateName, validateRole, validateObjectId } from './shared/validators.js';
+import { rateLimiters } from '../lib/shared/rate-limiter.js';
+import { logger } from '../lib/shared/logger.js';
+import { validateUsername, validatePassword, validateName, validateRole, validateObjectId } from '../lib/shared/validators.js';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;

@@ -1,13 +1,13 @@
 import { MongoClient, ObjectId } from 'mongodb';
 import jwt from 'jsonwebtoken';
-import { rateLimiters } from './shared/rate-limiter.js';
-import { logger } from './shared/logger.js';
-import { validateObjectId, validateTeamName, sanitizeString } from './shared/validators.js';
+import { rateLimiters } from '../lib/shared/rate-limiter.js';
+import { logger } from '../lib/shared/logger.js';
+import { validateObjectId, validateTeamName, sanitizeString } from '../lib/shared/validators.js';
 import { 
   getDefaultTeamSettings, 
   validateShiftPattern, 
   validateConcurrentLeave 
-} from './shared/working-days.js';
+} from '../lib/shared/working-days.js';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;

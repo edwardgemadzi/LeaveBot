@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, getAllLeaves, addLeaveRequest } from './shared/mongodb-storage.js';
-import { rateLimiters } from './shared/rate-limiter.js';
-import { logger } from './shared/logger.js';
-import { calculateWorkingDays, getDefaultTeamSettings } from './shared/working-days.js';
+import { JWT_SECRET, getAllLeaves, addLeaveRequest } from '../lib/shared/mongodb-storage.js';
+import { rateLimiters } from '../lib/shared/rate-limiter.js';
+import { logger } from '../lib/shared/logger.js';
+import { calculateWorkingDays, getDefaultTeamSettings } from '../lib/shared/working-days.js';
 import { ObjectId } from 'mongodb';
-import { connectToDatabase } from './shared/mongodb-storage.js';
+import { connectToDatabase } from '../lib/shared/mongodb-storage.js';
 
 // Authentication middleware
 function authenticateToken(req) {

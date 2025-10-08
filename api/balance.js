@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, connectToDatabase } from './shared/mongodb-storage.js';
-import { rateLimiters } from './shared/rate-limiter.js';
-import { logger } from './shared/logger.js';
-import { validateObjectId, validateBalance } from './shared/validators.js';
+import { JWT_SECRET, connectToDatabase } from '../lib/shared/mongodb-storage.js';
+import { rateLimiters } from '../lib/shared/rate-limiter.js';
+import { logger } from '../lib/shared/logger.js';
+import { validateObjectId, validateBalance } from '../lib/shared/validators.js';
 import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {

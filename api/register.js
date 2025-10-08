@@ -1,9 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin } from './shared/mongodb-storage.js';
-import { rateLimiters } from './shared/rate-limiter.js';
-import { logger } from './shared/logger.js';
-import { validateUsername, validatePassword, validateName } from './shared/validators.js';
+import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin } from '../lib/shared/mongodb-storage.js';
+import { rateLimiters } from '../lib/shared/rate-limiter.js';
+import { logger } from '../lib/shared/logger.js';
+import { validateUsername, validatePassword, validateName } from '../lib/shared/validators.js';
 
 // Initialize admin on cold start
 initializeAdmin();
