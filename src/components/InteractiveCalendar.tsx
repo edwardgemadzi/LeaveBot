@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay, addDays } from 'date-fns'
 import { enUS } from 'date-fns/locale/en-US'
@@ -53,6 +53,7 @@ interface LeaveCalendarProps {
   user: User
   leaves: Leave[]
   userSettings?: UserSettings | null
+  token: string
   onRequestLeave?: (startDate: Date, endDate: Date) => void
   onRefresh?: () => void
   showToast?: (message: string) => void
@@ -66,19 +67,61 @@ interface CalendarEvent {
   resource: Leave
 }
 
-export default function LeaveCalendar({ user, leaves, userSettings, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
+export default function LeaveCalendar({ user, leaves, userSettings, token, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
   const [view, setView] = useState<string>('month')
   // For leaders, default to showing team leaves; others start with own leaves only
   const [showTeamOnly, setShowTeamOnly] = useState(user.role === 'leader')
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
+  // Store all team members' settings for accurate working day calculation
+  const [teamMembersSettings, setTeamMembersSettings] = useState<Record<string, UserSettings>>({})
 
-  // Helper: Check if a date is a working day based on user's shift pattern
-  const isWorkingDay = (date: Date): boolean => {
-    if (!userSettings) {
+  // Fetch all team members' settings so we can display their leaves correctly
+  useEffect(() => {
+    const fetchTeamMembersSettings = async () => {
+      try {
+        // Get unique user IDs from leaves
+        const userIds = Array.from(new Set(leaves.map(leave => leave.userId)))
+        
+        // Fetch settings for each user
+        const settingsMap: Record<string, UserSettings> = {}
+        
+        await Promise.all(userIds.map(async (userId) => {
+          try {
+            const res = await fetch(`/api/users/${userId}/settings`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            })
+            
+            if (res.ok) {
+              const data = await res.json()
+              if (data.settings) {
+                settingsMap[userId] = data.settings
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to fetch settings for user ${userId}:`, err)
+          }
+        }))
+        
+        setTeamMembersSettings(settingsMap)
+      } catch (error) {
+        console.error('Error fetching team members settings:', error)
+      }
+    }
+    
+    if (leaves.length > 0 && token) {
+      fetchTeamMembersSettings()
+    }
+  }, [leaves, token])
+
+  // Helper: Check if a date is a working day based on a user's shift pattern
+  const isWorkingDay = (date: Date, settings?: UserSettings | null): boolean => {
+    if (!settings) {
       return true // If no settings, allow all days
     }
     
-    const { shiftPattern } = userSettings
+    const { shiftPattern } = settings
     
     // For rotation patterns (2-2, 3-3, 4-4, 5-5, custom), check the cycle
     // These patterns work ANY day of the week, just rotating on/off cycles
@@ -122,15 +165,12 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
   }
 
   // Helper: Split a leave into continuous working day ranges
-  const splitLeaveIntoWorkingDayRanges = (leave: Leave): Array<{ start: Date; end: Date }> => {
+  const splitLeaveIntoWorkingDayRanges = (leave: Leave, leaveOwnerSettings?: UserSettings | null): Array<{ start: Date; end: Date }> => {
     const startDate = new Date(leave.startDate)
     const endDate = new Date(leave.endDate)
     
-    // Get user settings for the leave owner
-    const leaveUserSettings = userSettings // TODO: In future, fetch per-user settings
-    
-    if (!leaveUserSettings) {
-      // No settings, return full range
+    // If no settings for this user, return full range (don't filter)
+    if (!leaveOwnerSettings) {
       return [{ start: startDate, end: addDays(endDate, 1) }]
     }
 
@@ -140,7 +180,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
     // Iterate through each day in the leave period
     let currentDate = new Date(startDate)
     while (currentDate <= endDate) {
-      const isWorking = isWorkingDay(currentDate)
+      const isWorking = isWorkingDay(currentDate, leaveOwnerSettings)
       
       if (isWorking) {
         if (!currentRangeStart) {
@@ -191,7 +231,9 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
     const calendarEvents: CalendarEvent[] = []
     
     filteredLeaves.forEach(leave => {
-      const workingDayRanges = splitLeaveIntoWorkingDayRanges(leave)
+      // Use the leave owner's settings, not the current user's settings
+      const leaveOwnerSettings = teamMembersSettings[leave.userId] || null
+      const workingDayRanges = splitLeaveIntoWorkingDayRanges(leave, leaveOwnerSettings)
       
       workingDayRanges.forEach((range, index) => {
         calendarEvents.push({
@@ -205,7 +247,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
     })
     
     return calendarEvents
-  }, [leaves, user, showTeamOnly, userSettings])
+  }, [leaves, user, showTeamOnly, teamMembersSettings])
 
   const handleSelectSlot = (slotInfo: any) => {
     // Only allow regular users to request leaves from calendar
@@ -223,8 +265,8 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
       // Calendar end date is exclusive, so subtract 1 day to get actual last day
       end = addDays(end, -1)
       
-      // Validate: First day must be a working day
-      if (!isWorkingDay(start)) {
+      // Validate: First day must be a working day (use current user's settings)
+      if (!isWorkingDay(start, userSettings)) {
         if (showToast) {
           showToast('⚠️ The first day must be a working day according to your shift pattern.')
         }
@@ -235,7 +277,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
       let hasNonWorkingDay = false
       const current = new Date(start)
       while (current <= end) {
-        if (!isWorkingDay(current)) {
+        if (!isWorkingDay(current, userSettings)) {
           hasNonWorkingDay = true
           break
         }
@@ -253,7 +295,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
         const d = new Date(start)
         d.setDate(d.getDate() + i)
         return d
-      }).filter(d => isWorkingDay(d)).length
+      }).filter(d => isWorkingDay(d, userSettings)).length
       
       if (showToast) {
         showToast(`Selected: ${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')} (${workingDaysCount} working days). Opening request form...`)

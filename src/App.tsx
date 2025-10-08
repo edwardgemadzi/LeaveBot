@@ -575,6 +575,7 @@ function App() {
           user={user} 
           leaves={leaves}
           userSettings={userSettings}
+          token={token}
           onRequestLeave={async (startDate, endDate) => {
             setStartDate(startDate.toISOString().split('T')[0])
             setEndDate(endDate.toISOString().split('T')[0])
