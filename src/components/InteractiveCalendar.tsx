@@ -87,7 +87,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, token, onReq
         
         await Promise.all(userIds.map(async (userId) => {
           try {
-            const res = await fetch(`/api/users/${userId}/settings`, {
+            const res = await fetch(`/api/users?id=${userId}&action=settings`, {
               headers: {
                 'Authorization': `Bearer ${token}`
               }
@@ -169,8 +169,10 @@ export default function LeaveCalendar({ user, leaves, userSettings, token, onReq
     const startDate = new Date(leave.startDate)
     const endDate = new Date(leave.endDate)
     
-    // If no settings for this user, return full range (don't filter)
+    // If no settings for this user, we can't filter by working days
+    // This shouldn't happen as backend returns defaults, but just in case
     if (!leaveOwnerSettings) {
+      console.warn(`No settings found for user ${leave.userId}, showing full range`)
       return [{ start: startDate, end: addDays(endDate, 1) }]
     }
 
