@@ -30,6 +30,12 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
           'Authorization': `Bearer ${token}`
         }
       })
+      
+      if (!res.ok) {
+        console.error('Failed to load settings:', res.status, res.statusText)
+        return
+      }
+      
       const data = await res.json()
       
       if (res.ok && data.success) {
