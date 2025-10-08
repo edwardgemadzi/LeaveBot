@@ -77,7 +77,7 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
       let body: any = {}
       
       if (action === 'delete') {
-        endpoint = `/api/leaves?id=${leaveId}`
+        endpoint = `/api/leaves/${leaveId}`
         method = 'DELETE'
       } else {
         endpoint = `/api/leaves/${leaveId}`
