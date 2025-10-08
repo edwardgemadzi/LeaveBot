@@ -1,28 +1,8 @@
 import { useMemo, useState } from 'react'
 import { LeaveBalance } from './LeaveBalance'
-
-interface Leave {
-  _id: string
-  employeeName: string
-  userId: string
-  startDate: string
-  endDate: string
-  leaveType?: string
-  reason: string
-  status: 'pending' | 'approved' | 'rejected'
-  createdAt: string
-  workingDaysCount?: number
-  calendarDaysCount?: number
-  shiftPattern?: string
-  shiftTime?: string
-}
-
-interface User {
-  id: string
-  username: string
-  name: string
-  role: 'admin' | 'leader' | 'user'
-}
+import type { Leave, User } from '../types'
+import { formatLeaveType } from '../utils/calendarStyles'
+import { calculateCalendarDays, formatDisplayDate, formatDateRange, isCurrentMonth } from '../utils/dateHelpers'
 
 interface DashboardProps {
   user: User
@@ -43,26 +23,6 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
   } | null>(null)
   const [overridePassword, setOverridePassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
-
-  // Helper to format leave type with emoji
-  const formatLeaveType = (leaveType?: string) => {
-    if (!leaveType) return '📝 Other'
-    
-    const types: Record<string, string> = {
-      vacation: '🏖️ Vacation',
-      sick: '🤒 Sick Leave',
-      personal: '🏠 Personal',
-      study: '📚 Study Leave',
-      maternity: '👶 Maternity',
-      paternity: '👨‍👶 Paternity',
-      bereavement: '🕊️ Bereavement',
-      emergency: '🚨 Emergency',
-      unpaid: '💼 Unpaid',
-      other: '📝 Other'
-    }
-    
-    return types[leaveType] || '📝 Other'
-  }
 
   const handleLeaveAction = async (leaveId: string, action: 'approve' | 'reject' | 'delete', password?: string) => {
     if (!token) return
