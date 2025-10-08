@@ -80,6 +80,32 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
 
   async function loadLeaveBalances(userList: User[]) {
     try {
+      // Fetch team settings to get annual leave days
+      let annualLeaveDays = 21 // Default
+      
+      if (currentUser.role === 'leader') {
+        // Get leader's team settings
+        const teamsRes = await fetch('/api/teams', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        const teamsData = await teamsRes.json()
+        const leaderTeam = Array.isArray(teamsData) ? teamsData[0] : teamsData.teams?.[0]
+        
+        if (leaderTeam?._id) {
+          const settingsRes = await fetch(`/api/teams?id=${leaderTeam._id}&action=settings`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          const settingsData = await settingsRes.json()
+          if (settingsData.settings?.annualLeaveDays) {
+            annualLeaveDays = settingsData.settings.annualLeaveDays
+          }
+        }
+      }
+      
       // Fetch leaves for all users
       const res = await fetch('/api/leaves', {
         headers: {
@@ -99,14 +125,12 @@ export default function UserManagement({ currentUser, token }: UserManagementPro
             sum + (leave.workingDaysCount || 0), 0
           )
           
-          const totalDays = 21 // Default, can be from team settings
-          
           return {
             ...user,
             leaveBalance: {
-              total: totalDays,
+              total: annualLeaveDays,
               used: usedDays,
-              remaining: totalDays - usedDays
+              remaining: annualLeaveDays - usedDays
             }
           }
         })
