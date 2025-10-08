@@ -19,15 +19,6 @@ interface UserProfileModalProps {
         customStart?: string
         customEnd?: string
       }
-      workingDays: {
-        monday: boolean
-        tuesday: boolean
-        wednesday: boolean
-        thursday: boolean
-        friday: boolean
-        saturday: boolean
-        sunday: boolean
-      }
     }
   }
   token: string
@@ -44,15 +35,6 @@ const defaultSettings = {
     type: 'day',
     customStart: '08:00',
     customEnd: '17:00'
-  },
-  workingDays: {
-    monday: true,
-    tuesday: true,
-    wednesday: true,
-    thursday: true,
-    friday: true,
-    saturday: false,
-    sunday: false
   }
 }
 
@@ -87,8 +69,7 @@ export default function UserProfileModal({ isOpen, onClose, user, token, onSucce
         },
         body: JSON.stringify({
           shiftPattern: settings.shiftPattern,
-          shiftTime: settings.shiftTime,
-          workingDays: settings.workingDays
+          shiftTime: settings.shiftTime
         })
       })
 

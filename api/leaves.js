@@ -134,25 +134,28 @@ export default async function handler(req, res) {
       if (!userSettings || Object.keys(userSettings).length === 0) {
         userSettings = {
           shiftPattern: { type: 'regular' },
-          shiftTime: { type: 'day' },
-          workingDays: {
-            monday: true,
-            tuesday: true,
-            wednesday: true,
-            thursday: true,
-            friday: true,
-            saturday: false,
-            sunday: false
-          }
+          shiftTime: { type: 'day' }
         };
       }
+
+      // For regular patterns, working days are always Mon-Fri
+      // For rotation patterns, working days are calculated from the pattern
+      const workingDaysConfig = userSettings.shiftPattern?.type === 'regular' ? {
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: false,
+        sunday: false
+      } : null;
 
       // Calculate working days based on user settings
       const result = calculateWorkingDays(
         start,
         end,
         userSettings.shiftPattern,
-        userSettings.workingDays
+        workingDaysConfig
       );
 
       // Get team settings for concurrent leave checking

@@ -590,7 +590,7 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
   }
 
   // Validate settings structure
-  const { shiftPattern, shiftTime, workingDays } = req.body;
+  const { shiftPattern, shiftTime } = req.body;
 
   const newSettings = {};
 
@@ -659,38 +659,6 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
     }
 
     newSettings.shiftTime = shiftTime;
-  }
-
-  // Validate working days
-  if (workingDays) {
-    const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const workingDaysObj = {};
-    let hasAtLeastOneDay = false;
-
-    for (const day of validDays) {
-      if (workingDays.hasOwnProperty(day)) {
-        if (typeof workingDays[day] !== 'boolean') {
-          return res.status(400).json({ 
-            success: false, 
-            error: `Working day '${day}' must be a boolean` 
-          });
-        }
-        workingDaysObj[day] = workingDays[day];
-        if (workingDays[day]) hasAtLeastOneDay = true;
-      }
-    }
-
-    // Only require at least one day for 'regular' patterns
-    // Rotation patterns (2-2, 3-3, etc) work any day of the week
-    const patternType = newSettings.shiftPattern?.type || user.settings?.shiftPattern?.type || 'regular';
-    if (!hasAtLeastOneDay && patternType === 'regular') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'At least one working day must be selected for regular patterns' 
-      });
-    }
-
-    newSettings.workingDays = workingDaysObj;
   }
 
   // Merge with existing settings

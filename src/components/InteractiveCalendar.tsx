@@ -47,15 +47,6 @@ interface UserSettings {
     customStart?: string
     customEnd?: string
   }
-  workingDays: {
-    monday: boolean
-    tuesday: boolean
-    wednesday: boolean
-    thursday: boolean
-    friday: boolean
-    saturday: boolean
-    sunday: boolean
-  }
 }
 
 interface LeaveCalendarProps {
@@ -87,7 +78,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
       return true // If no settings, allow all days
     }
     
-    const { shiftPattern, workingDays } = userSettings
+    const { shiftPattern } = userSettings
     
     // For rotation patterns (2-2, 3-3, 4-4, 5-5, custom), check the cycle
     // These patterns work ANY day of the week, just rotating on/off cycles
@@ -119,12 +110,11 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
       }
     }
     
-    // For regular pattern, check working days configuration
+    // For regular pattern, working days are always Mon-Fri
     if (shiftPattern.type === 'regular') {
       const dayOfWeek = date.getDay()
-      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-      const dayName = dayNames[dayOfWeek] as keyof typeof workingDays
-      return workingDays[dayName] || false
+      // 0 = Sunday, 6 = Saturday
+      return dayOfWeek >= 1 && dayOfWeek <= 5 // Monday to Friday
     }
     
     // Fallback: allow the day
