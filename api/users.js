@@ -106,10 +106,35 @@ async function handleListUsers(req, res, decoded, startTime) {
 
   const client = await connectDB();
   const db = client.db('leavebot');
-  let users = await db.collection('users').find({}).toArray();
+  const usersCollection = db.collection('users');
+  const teamsCollection = db.collection('teams');
+  
+  let users;
   
   if (decoded.role === 'leader') {
-    users = users.filter(u => u.role !== 'admin');
+    // Leaders can only see their own team members
+    const leaderTeam = await teamsCollection.findOne({ leaderId: new ObjectId(decoded.id) });
+    
+    if (!leaderTeam) {
+      logger.warn('Leader has no assigned team', { userId: decoded.id });
+      return res.status(200).json({ success: true, users: [] });
+    }
+    
+    // Get only users in the leader's team (exclude admins and other leaders)
+    users = await usersCollection.find({ 
+      teamId: leaderTeam._id,
+      role: 'user'  // Leaders can only manage regular users
+    }).toArray();
+    
+    logger.info('Leader viewing team members', {
+      leaderId: decoded.id,
+      teamId: leaderTeam._id.toString(),
+      teamName: leaderTeam.name,
+      memberCount: users.length
+    });
+  } else {
+    // Admins see all users
+    users = await usersCollection.find({}).toArray();
   }
   
   const safeUsers = users.map(({ passwordHash, ...user }) => ({

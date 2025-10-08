@@ -347,6 +347,13 @@ function App() {
         return
       }
       
+      // Handle concurrent limit error
+      if (res.status === 409 && data.error === 'concurrent_limit_reached') {
+        setError(data.message || 'Maximum concurrent leave limit reached. Please contact your team leader.')
+        setLoading(false)
+        return
+      }
+      
       if (data.success) {
         success('Leave request submitted successfully!')
         setEmployeeName('')

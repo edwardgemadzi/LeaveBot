@@ -121,6 +121,53 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
     return true
   }
 
+  // Helper: Split a leave into continuous working day ranges
+  const splitLeaveIntoWorkingDayRanges = (leave: Leave): Array<{ start: Date; end: Date }> => {
+    const startDate = new Date(leave.startDate)
+    const endDate = new Date(leave.endDate)
+    
+    // Get user settings for the leave owner
+    const leaveUserSettings = userSettings // TODO: In future, fetch per-user settings
+    
+    if (!leaveUserSettings) {
+      // No settings, return full range
+      return [{ start: startDate, end: addDays(endDate, 1) }]
+    }
+
+    const ranges: Array<{ start: Date; end: Date }> = []
+    let currentRangeStart: Date | null = null
+    
+    // Iterate through each day in the leave period
+    let currentDate = new Date(startDate)
+    while (currentDate <= endDate) {
+      const isWorking = isWorkingDay(currentDate)
+      
+      if (isWorking) {
+        if (!currentRangeStart) {
+          // Start a new range
+          currentRangeStart = new Date(currentDate)
+        }
+      } else {
+        if (currentRangeStart) {
+          // End the current range (yesterday was the last working day)
+          const rangeEnd = new Date(currentDate)
+          ranges.push({ start: currentRangeStart, end: rangeEnd })
+          currentRangeStart = null
+        }
+      }
+      
+      // Move to next day
+      currentDate = addDays(currentDate, 1)
+    }
+    
+    // If there's an open range at the end, close it
+    if (currentRangeStart) {
+      ranges.push({ start: currentRangeStart, end: addDays(endDate, 1) })
+    }
+    
+    return ranges.length > 0 ? ranges : [{ start: startDate, end: addDays(endDate, 1) }]
+  }
+
   const events: CalendarEvent[] = useMemo(() => {
     let filteredLeaves = leaves
 
@@ -140,21 +187,25 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
       filteredLeaves = leaves.filter(l => l.userId === user.id)
     }
 
-    // Show all leaves (approved, pending, rejected) for visibility
-    return filteredLeaves.map(leave => {
-      const startDate = new Date(leave.startDate)
-      // Add 1 day to end date to include the last day (calendar end is exclusive)
-      const endDate = addDays(new Date(leave.endDate), 1)
+    // Split each leave into working-day-only ranges
+    const calendarEvents: CalendarEvent[] = []
+    
+    filteredLeaves.forEach(leave => {
+      const workingDayRanges = splitLeaveIntoWorkingDayRanges(leave)
       
-      return {
-        id: leave._id,
-        title: `${leave.employeeName}${leave.status !== 'approved' ? ` (${leave.status})` : ''}`,
-        start: startDate,
-        end: endDate,
-        resource: leave
-      }
+      workingDayRanges.forEach((range, index) => {
+        calendarEvents.push({
+          id: `${leave._id}-${index}`,
+          title: `${leave.employeeName}${leave.status !== 'approved' ? ` (${leave.status})` : ''}`,
+          start: range.start,
+          end: range.end,
+          resource: leave
+        })
+      })
     })
-  }, [leaves, user, showTeamOnly])
+    
+    return calendarEvents
+  }, [leaves, user, showTeamOnly, userSettings])
 
   const handleSelectSlot = (slotInfo: any) => {
     // Only allow regular users to request leaves from calendar

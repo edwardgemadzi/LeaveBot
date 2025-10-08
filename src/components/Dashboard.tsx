@@ -248,7 +248,11 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
 
       {/* Leave Balance - Only show for regular users */}
       {user.role !== 'admin' && user.role !== 'leader' && token && (
-        <LeaveBalance userId={user.id} token={token} />
+        <LeaveBalance 
+          key={leaves.filter(l => l.userId === user.id && l.status === 'approved').length} 
+          userId={user.id} 
+          token={token} 
+        />
       )}
 
       {/* Statistics Cards */}

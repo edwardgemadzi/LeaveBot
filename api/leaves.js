@@ -258,6 +258,50 @@ export default async function handler(req, res) {
     const { employeeName, startDate, endDate, reason } = validation.data;
     const { workingDaysCount, calendarDaysCount, shiftPattern, shiftTime, leaveType } = req.body;
     
+    // Get user's team to check concurrent leave limits
+    const client = await connectToDatabase();
+    const { db } = client;
+    const usersCollection = db.collection('users');
+    const teamsCollection = db.collection('teams');
+    const leavesCollection = db.collection('leaves');
+    
+    const user = await usersCollection.findOne({ _id: new ObjectId(auth.user.id) });
+    
+    // Check concurrent leave limits if user has a team
+    if (user?.teamId) {
+      const team = await teamsCollection.findOne({ _id: user.teamId });
+      
+      if (team?.settings?.maxConcurrentLeave) {
+        // Find overlapping approved leaves
+        const overlappingLeaves = await leavesCollection.find({
+          teamId: team._id,
+          status: 'approved',
+          startDate: { $lte: new Date(endDate) },
+          endDate: { $gte: new Date(startDate) }
+        }).toArray();
+        
+        const uniqueUsersOnLeave = new Set(overlappingLeaves.map(l => l.userId.toString()));
+        const currentCount = uniqueUsersOnLeave.size;
+        
+        // Block regular users if limit would be exceeded
+        if (currentCount >= team.settings.maxConcurrentLeave && auth.user.role === 'user') {
+          logger.warn('Leave request blocked - concurrent limit reached', {
+            userId: auth.user.id,
+            teamId: team._id.toString(),
+            currentCount,
+            limit: team.settings.maxConcurrentLeave
+          });
+          
+          return res.status(409).json({
+            error: 'concurrent_limit_reached',
+            message: `Cannot request leave: ${currentCount} out of ${team.settings.maxConcurrentLeave} team members are already on leave during this period. Please contact your team leader if this is urgent.`,
+            currentCount,
+            limit: team.settings.maxConcurrentLeave
+          });
+        }
+      }
+    }
+    
     const leaveData = {
       userId: auth.user.id,
       username: auth.user.username,
@@ -266,6 +310,7 @@ export default async function handler(req, res) {
       endDate,
       reason,
       leaveType: leaveType ? String(leaveType) : 'other',
+      teamId: user?.teamId || null,
       // Include calculated working days if provided
       ...(workingDaysCount !== undefined && { workingDaysCount: Number(workingDaysCount) }),
       ...(calendarDaysCount !== undefined && { calendarDaysCount: Number(calendarDaysCount) }),
