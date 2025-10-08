@@ -250,6 +250,28 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
     }
   }
 
+  // Style non-working days differently to show user's actual working days
+  const dayPropGetter = (date: Date) => {
+    if (!userSettings) {
+      return {} // No special styling if no user settings
+    }
+
+    const working = isWorkingDay(date)
+    
+    if (!working) {
+      return {
+        style: {
+          backgroundColor: '#f9fafb',
+          color: '#9ca3af',
+          textDecoration: 'line-through',
+          opacity: 0.6
+        }
+      }
+    }
+    
+    return {}
+  }
+
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -322,6 +344,12 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
           <div style={{ width: '16px', height: '16px', backgroundColor: '#ef4444', borderRadius: '4px' }}></div>
           <span>Rejected</span>
         </div>
+        {userSettings && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '16px', height: '16px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb' }}></div>
+            <span style={{ color: '#6b7280' }}>Non-Working Days</span>
+          </div>
+        )}
       </div>
 
       <div style={{ 
@@ -343,6 +371,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           eventPropGetter={eventStyleGetter}
+          dayPropGetter={dayPropGetter}
           popup
         />
       </div>

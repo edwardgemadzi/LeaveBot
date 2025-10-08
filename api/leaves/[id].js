@@ -127,27 +127,27 @@ export default async function handler(req, res) {
 
   // DELETE - Delete leave request
   if (req.method === 'DELETE') {
+    // Only admins can delete leave requests
+    if (auth.user.role !== 'admin') {
+      logger.warn('Non-admin attempted to delete leave', { 
+        userId: auth.user.id, 
+        role: auth.user.role,
+        leaveId 
+      });
+      return res.status(403).json({ 
+        error: 'Only administrators can delete leave requests' 
+      });
+    }
+
     try {
       const { db } = await connectToDatabase();
       const leavesCollection = db.collection('leaves');
       
-      // Get the leave to check permissions
+      // Get the leave to verify it exists
       const leave = await leavesCollection.findOne({ _id: new ObjectId(leaveId) });
       
       if (!leave) {
         return res.status(404).json({ error: 'Leave request not found' });
-      }
-      
-      // Admins and leaders can delete any leave
-      // Users can only delete their own pending leaves
-      const canDelete = auth.user.role === 'admin' || 
-                       auth.user.role === 'leader' ||
-                       (leave.userId === auth.user.id && leave.status === 'pending');
-      
-      if (!canDelete) {
-        return res.status(403).json({ 
-          error: 'You can only delete your own pending leave requests' 
-        });
       }
 
       await leavesCollection.deleteOne({ _id: new ObjectId(leaveId) });

@@ -398,26 +398,28 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
                             </button>
                           </>
                         )}
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete this leave request from ${leave.employeeName}?`)) {
-                              handleLeaveAction(leave._id, 'delete')
-                            }
-                          }}
-                          disabled={processing === leave._id}
-                          style={{
-                            padding: '4px 12px',
-                            background: processing === leave._id ? '#9ca3af' : '#6b7280',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: processing === leave._id ? 'not-allowed' : 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500'
-                          }}
-                        >
-                          🗑️ Delete
-                        </button>
+                        {user.role === 'admin' && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Delete this leave request from ${leave.employeeName}?`)) {
+                                handleLeaveAction(leave._id, 'delete')
+                              }
+                            }}
+                            disabled={processing === leave._id}
+                            style={{
+                              padding: '4px 12px',
+                              background: processing === leave._id ? '#9ca3af' : '#6b7280',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: processing === leave._id ? 'not-allowed' : 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '500'
+                            }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
