@@ -34,6 +34,7 @@ function App() {
   const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
   const [showProfileSettings, setShowProfileSettings] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [userSettings, setUserSettings] = useState<any>(null)
   const [calculatedDays, setCalculatedDays] = useState<{
     workingDays: number
@@ -290,6 +291,27 @@ function App() {
     }
   }
 
+  async function loadTeamMembers() {
+    if (!token || user.role !== 'leader') return
+    
+    try {
+      const res = await fetch('/api/users', {
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await res.json()
+      
+      if (res.ok && data.success) {
+        // Filter to only show regular users (team members)
+        const members = data.users.filter((u: any) => u.role === 'user')
+        setTeamMembers(members)
+      }
+    } catch (err) {
+      console.error('Failed to load team members:', err)
+    }
+  }
+
   async function handleSubmitLeave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -530,10 +552,18 @@ function App() {
           user={user} 
           leaves={leaves}
           userSettings={userSettings}
-          onRequestLeave={(startDate, endDate) => {
+          onRequestLeave={async (startDate, endDate) => {
             setStartDate(startDate.toISOString().split('T')[0])
             setEndDate(endDate.toISOString().split('T')[0])
-            setEmployeeName(user.name)
+            
+            // For leaders, load team members and don't pre-fill employee name
+            if (user.role === 'leader') {
+              await loadTeamMembers()
+              setEmployeeName('') // Leader must select a team member
+            } else {
+              setEmployeeName(user.name)
+            }
+            
             setShowRequestModal(true)
           }}
           onRefresh={() => loadLeaves()}
@@ -620,7 +650,9 @@ function App() {
               alignItems: 'center',
               marginBottom: '25px'
             }}>
-              <h2 style={{ margin: 0, color: '#1f2937' }}>✏️ Request Leave</h2>
+              <h2 style={{ margin: 0, color: '#1f2937' }}>
+                ✏️ {user.role === 'leader' ? 'Request Leave for Team Member' : 'Request Leave'}
+              </h2>
               <button
                 onClick={() => {
                   setShowRequestModal(false)
@@ -645,15 +677,33 @@ function App() {
             </div>
 
             <form onSubmit={handleSubmitLeave}>
-              <input 
-                type="text" 
-                placeholder="Employee Name" 
-                value={employeeName}
-                onChange={e=>setEmployeeName(e.target.value)}
-                style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
-                required
-                disabled={loading}
-              />
+              {/* For leaders: dropdown to select team member */}
+              {user.role === 'leader' ? (
+                <select
+                  value={employeeName}
+                  onChange={e => setEmployeeName(e.target.value)}
+                  style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd'}}
+                  required
+                  disabled={loading}
+                >
+                  <option value="">Select Team Member</option>
+                  {teamMembers.map((member: any) => (
+                    <option key={member.id} value={member.name}>
+                      {member.name} (@{member.username})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                /* For regular users: show their own name as read-only */
+                <input 
+                  type="text" 
+                  placeholder="Employee Name" 
+                  value={employeeName}
+                  style={{width:'100%',padding:'10px',margin:'10px 0',borderRadius:'5px',border:'1px solid #ddd',background:'#f3f4f6',color:'#6b7280'}}
+                  readOnly
+                  disabled={loading}
+                />
+              )}
               <input 
                 type="date" 
                 placeholder="Start Date" 
