@@ -57,16 +57,28 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
         body: JSON.stringify(teamSettings)
       })
       
+      if (!res.ok) {
+        // Try to parse error message
+        try {
+          const data = await res.json()
+          setError(data.error || `Server error: ${res.status}`)
+        } catch {
+          setError(`Server error: ${res.status} ${res.statusText}`)
+        }
+        return
+      }
+      
       const data = await res.json()
       
-      if (res.ok && data.success) {
+      if (data.success) {
         setSuccess('Team leave settings saved successfully!')
         setTimeout(() => setSuccess(''), 3000)
       } else {
         setError(data.error || 'Failed to save settings')
       }
-    } catch (err) {
-      setError('Network error. Please try again.')
+    } catch (err: any) {
+      console.error('Save error:', err)
+      setError(`Network error: ${err.message || 'Please try again.'}`)
     } finally {
       setSaving(false)
     }

@@ -631,12 +631,31 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
       });
     }
 
-    const validTimes = ['day', 'night'];
+    const validTimes = ['day', 'night', 'custom'];
     if (!validTimes.includes(shiftTime.type)) {
       return res.status(400).json({ 
         success: false, 
         error: `Invalid shift time type. Must be one of: ${validTimes.join(', ')}` 
       });
+    }
+
+    // Validate custom time fields if type is custom
+    if (shiftTime.type === 'custom') {
+      if (!shiftTime.customStart || !shiftTime.customEnd) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Custom shift time requires customStart and customEnd times' 
+        });
+      }
+      
+      // Basic time format validation (HH:MM)
+      const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(shiftTime.customStart) || !timeRegex.test(shiftTime.customEnd)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Custom times must be in HH:MM format (e.g., 08:00, 17:00)' 
+        });
+      }
     }
 
     newSettings.shiftTime = shiftTime;
