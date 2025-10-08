@@ -797,6 +797,7 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
     });
 
     return res.status(200).json({
+      success: true,
       message: 'Team settings updated successfully',
       settings: updatedSettings
     });
