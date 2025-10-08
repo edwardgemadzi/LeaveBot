@@ -170,25 +170,54 @@ async function handleCreateUser(req, res, decoded, startTime) {
   const client = await connectDB();
   const db = client.db('leavebot');
   const usersCollection = db.collection('users');
+  const teamsCollection = db.collection('teams');
 
   const existing = await usersCollection.findOne({ username: usernameValidation.value });
   if (existing) {
     return res.status(400).json({ success: false, error: 'Username already exists' });
   }
 
+  // If leader is creating the user, get their team and auto-assign
+  let teamId = null;
+  if (decoded.role === 'leader') {
+    const leaderTeam = await teamsCollection.findOne({ leaderId: new ObjectId(decoded.id) });
+    if (leaderTeam) {
+      teamId = leaderTeam._id;
+    }
+  }
+
   const passwordHash = await bcrypt.hash(passwordValidation.value, 10);
-  const result = await usersCollection.insertOne({
+  const newUser = {
     username: usernameValidation.value,
     passwordHash,
     name: nameValidation.value,
     role: roleValidation.value,
     createdAt: new Date()
-  });
+  };
+
+  // Add teamId if leader is creating the user
+  if (teamId) {
+    newUser.teamId = teamId;
+  }
+
+  const result = await usersCollection.insertOne(newUser);
+
+  // If user was assigned to a team, add them to team members array
+  if (teamId) {
+    await teamsCollection.updateOne(
+      { _id: teamId },
+      { 
+        $addToSet: { members: result.insertedId },
+        $set: { updatedAt: new Date() }
+      }
+    );
+  }
 
   logger.info('User created', { 
     userId: result.insertedId.toString(), 
     username: usernameValidation.value, 
     role: roleValidation.value,
+    teamId: teamId ? teamId.toString() : null,
     createdBy: decoded.username 
   });
 
