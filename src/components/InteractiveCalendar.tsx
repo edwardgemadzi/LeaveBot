@@ -69,8 +69,8 @@ interface CalendarEvent {
 
 export default function LeaveCalendar({ user, leaves, userSettings, token, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
   const [view, setView] = useState<string>('month')
-  // For leaders, default to showing team leaves; others start with own leaves only
-  const [showTeamOnly, setShowTeamOnly] = useState(user.role === 'leader')
+  // Default to showing team leaves for both leaders and regular users
+  const [showTeamOnly, setShowTeamOnly] = useState(true)
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
   // Store all team members' settings for accurate working day calculation
   const [teamMembersSettings, setTeamMembersSettings] = useState<Record<string, UserSettings>>({})
@@ -223,8 +223,13 @@ export default function LeaveCalendar({ user, leaves, userSettings, token, onReq
       }
       // When on, backend already filtered by team, show all
     } else {
-      // Regular users see only their own leaves
-      filteredLeaves = leaves.filter(l => l.userId === user.id)
+      // Regular users: backend returns all team leaves
+      // When showTeamOnly is off, show only their own leaves
+      // When on, show all team leaves
+      if (!showTeamOnly) {
+        filteredLeaves = leaves.filter(l => l.userId === user.id)
+      }
+      // When on, show all leaves (backend already filtered by team)
     }
 
     // Split each leave into working-day-only ranges
