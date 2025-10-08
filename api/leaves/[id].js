@@ -62,11 +62,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Leave ID is required' });
   }
 
-  // PUT - Update leave status (approve/reject)
+  // PUT - Approve or reject a leave request
   if (req.method === 'PUT') {
-    // Only admins and leaders can approve/reject leaves
     if (auth.user.role !== 'admin' && auth.user.role !== 'leader') {
-      logger.warn('Non-admin/leader attempted to update leave status', { 
+      logger.warn('Unauthorized approval attempt', { 
         userId: auth.user.id, 
         role: auth.user.role 
       });
@@ -75,7 +74,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const { status } = req.body;
+    const { status, overridePassword } = req.body;
     if (!status || !['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ 
         error: 'Valid status (approved or rejected) is required' 
@@ -85,6 +84,90 @@ export default async function handler(req, res) {
     try {
       const { db } = await connectToDatabase();
       const leavesCollection = db.collection('leaves');
+      const teamsCollection = db.collection('teams');
+      const usersCollection = db.collection('users');
+
+      // Get the leave request details first
+      const leave = await leavesCollection.findOne({ _id: new ObjectId(leaveId) });
+      if (!leave) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+
+      // Check concurrent leave limit if approving
+      let requiresPasswordOverride = false;
+      let concurrentWarning = null;
+
+      if (status === 'approved') {
+        // Get the user's team
+        const requestingUser = await usersCollection.findOne({ _id: leave.userId });
+        if (requestingUser?.teamId) {
+          const team = await teamsCollection.findOne({ _id: requestingUser.teamId });
+          
+          if (team?.settings?.maxConcurrentLeave) {
+            // Count overlapping approved leaves
+            const overlappingLeaves = await leavesCollection.find({
+              teamId: team._id,
+              status: 'approved',
+              _id: { $ne: leave._id }, // Exclude current leave
+              startDate: { $lte: leave.endDate },
+              endDate: { $gte: leave.startDate }
+            }).toArray();
+
+            const uniqueUsersOnLeave = new Set(overlappingLeaves.map(l => l.userId.toString()));
+            const currentCount = uniqueUsersOnLeave.size;
+
+            // Check if limit would be exceeded
+            if (currentCount >= team.settings.maxConcurrentLeave) {
+              requiresPasswordOverride = true;
+              concurrentWarning = `⚠️ WARNING: Approving this leave will exceed the concurrent leave limit. Currently ${currentCount} out of ${team.settings.maxConcurrentLeave} team members are on leave during this period.`;
+              
+              // If password override is required but not provided, return warning
+              if (!overridePassword) {
+                logger.warn('Concurrent leave limit exceeded, password required', {
+                  leaveId,
+                  teamId: team._id.toString(),
+                  currentCount,
+                  limit: team.settings.maxConcurrentLeave,
+                  requestedBy: auth.user.id
+                });
+
+                return res.status(409).json({
+                  error: 'concurrent_limit_exceeded',
+                  warning: concurrentWarning,
+                  requiresPasswordOverride: true,
+                  currentCount,
+                  limit: team.settings.maxConcurrentLeave
+                });
+              }
+
+              // Verify password if override is attempted
+              if (overridePassword) {
+                const bcrypt = await import('bcryptjs');
+                const leader = await usersCollection.findOne({ _id: new ObjectId(auth.user.id) });
+                
+                const validPassword = await bcrypt.compare(overridePassword, leader.password);
+                if (!validPassword) {
+                  logger.warn('Invalid password for concurrent leave override', {
+                    leaveId,
+                    userId: auth.user.id
+                  });
+                  return res.status(401).json({ 
+                    error: 'Invalid password. Override failed.' 
+                  });
+                }
+
+                logger.info('Concurrent leave limit overridden with password', {
+                  leaveId,
+                  teamId: team._id.toString(),
+                  overriddenBy: auth.user.id,
+                  currentCount,
+                  limit: team.settings.maxConcurrentLeave
+                });
+              }
+            }
+          }
+        }
+      }
 
       const result = await leavesCollection.updateOne(
         { _id: new ObjectId(leaveId) },

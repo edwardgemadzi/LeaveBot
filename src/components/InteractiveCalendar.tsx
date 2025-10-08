@@ -84,21 +84,29 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
   // Helper: Check if a date is a working day based on user's shift pattern
   const isWorkingDay = (date: Date): boolean => {
     if (!userSettings) {
-      console.log('No userSettings available, treating all days as working days')
       return true // If no settings, allow all days
     }
     
     const { shiftPattern, workingDays } = userSettings
     
-    console.log('Checking working day for', date.toDateString(), 'with pattern:', shiftPattern?.type)
-    
-    // For rotation patterns (2-2, 3-3, 4-4, 5-5), ONLY check the cycle, NOT weekdays
+    // For rotation patterns (2-2, 3-3, 4-4, 5-5, custom), check the cycle
     // These patterns work ANY day of the week, just rotating on/off cycles
     if (shiftPattern.type !== 'regular' && shiftPattern.referenceDate) {
       const referenceDate = new Date(shiftPattern.referenceDate)
       const daysSinceReference = Math.floor((date.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24))
       
-      // Extract cycle length from pattern type (e.g., "2-2" -> 2+2=4 day cycle)
+      // For custom patterns, use customPattern field
+      if (shiftPattern.type === 'custom' && shiftPattern.customPattern) {
+        // Custom pattern format: "WWWOO" where W=work, O=off
+        const pattern = shiftPattern.customPattern.toUpperCase()
+        const cycleLength = pattern.length
+        const positionInCycle = ((daysSinceReference % cycleLength) + cycleLength) % cycleLength
+        const dayChar = pattern[positionInCycle]
+        
+        return dayChar === 'W' // W = working day
+      }
+      
+      // For standard rotation patterns (2-2, 3-3, etc.)
       const match = shiftPattern.type.match(/^(\d+)-(\d+)$/)
       if (match) {
         const workDays = parseInt(match[1])
@@ -106,10 +114,8 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
         const cycleLength = workDays + offDays
         const positionInCycle = ((daysSinceReference % cycleLength) + cycleLength) % cycleLength
         
-        const isWorking = positionInCycle < workDays
-        console.log(`Rotation pattern: position ${positionInCycle} in ${cycleLength}-day cycle = ${isWorking ? 'working' : 'off'}`)
         // First part of cycle is working days
-        return isWorking
+        return positionInCycle < workDays
       }
     }
     
@@ -118,13 +124,10 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
       const dayOfWeek = date.getDay()
       const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
       const dayName = dayNames[dayOfWeek] as keyof typeof workingDays
-      const isWorking = workingDays[dayName] || false
-      console.log(`Regular pattern: ${dayName} = ${isWorking ? 'working' : 'off'}`)
-      return isWorking
+      return workingDays[dayName] || false
     }
     
     // Fallback: allow the day
-    console.log('Fallback: allowing day')
     return true
   }
 
@@ -263,13 +266,10 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
   // Style non-working days differently to show user's actual working days
   const dayPropGetter = (date: Date) => {
     if (!userSettings) {
-      console.log('dayPropGetter: No userSettings, no special styling')
       return {} // No special styling if no user settings
     }
 
     const working = isWorkingDay(date)
-    
-    console.log(`dayPropGetter: ${date.toDateString()} is ${working ? 'WORKING' : 'NON-WORKING'}`)
     
     if (!working) {
       return {
@@ -384,7 +384,7 @@ export default function LeaveCalendar({ user, leaves, userSettings, onRequestLea
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           eventPropGetter={eventStyleGetter}
-          dayPropGetter={dayPropGetter}
+          slotPropGetter={dayPropGetter}
           popup
         />
       </div>

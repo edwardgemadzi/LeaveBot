@@ -16,7 +16,8 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
     maxConsecutiveDays: 14,
     minAdvanceNoticeDays: 7,
     allowNegativeBalance: false,
-    carryOverDays: 5
+    carryOverDays: 5,
+    maxConcurrentLeave: 3 // Max people on leave at the same time
   })
 
   useEffect(() => {
@@ -295,6 +296,38 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
             />
             <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
               Maximum unused days that can be carried over to next year
+            </p>
+          </div>
+
+          {/* Max Concurrent Leave */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontWeight: '600',
+              marginBottom: '8px',
+              color: '#374151'
+            }}>
+              👥 Maximum Concurrent Leave
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={teamSettings.maxConcurrentLeave}
+              onChange={(e) => setTeamSettings({
+                ...teamSettings,
+                maxConcurrentLeave: parseInt(e.target.value) || 1
+              })}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                fontSize: '14px'
+              }}
+            />
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              Maximum number of team members who can be on leave at the same time
             </p>
           </div>
 

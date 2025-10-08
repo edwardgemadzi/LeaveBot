@@ -34,6 +34,15 @@ interface DashboardProps {
 export default function Dashboard({ user, leaves, token, onLeaveUpdate }: DashboardProps) {
   const [processing, setProcessing] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [overrideModal, setOverrideModal] = useState<{
+    show: boolean
+    leaveId: string
+    warning: string
+    currentCount: number
+    limit: number
+  } | null>(null)
+  const [overridePassword, setOverridePassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   // Helper to format leave type with emoji
   const formatLeaveType = (leaveType?: string) => {
@@ -55,16 +64,17 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
     return types[leaveType] || '📝 Other'
   }
 
-  const handleLeaveAction = async (leaveId: string, action: 'approve' | 'reject' | 'delete') => {
+  const handleLeaveAction = async (leaveId: string, action: 'approve' | 'reject' | 'delete', password?: string) => {
     if (!token) return
     
     setProcessing(leaveId)
     setError('')
+    setPasswordError('')
     
     try {
       let endpoint = ''
       let method = ''
-      let body = {}
+      let body: any = {}
       
       if (action === 'delete') {
         endpoint = `/api/leaves?id=${leaveId}`
@@ -72,7 +82,10 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
       } else {
         endpoint = `/api/leaves/${leaveId}`
         method = 'PUT'
-        body = { status: action === 'approve' ? 'approved' : 'rejected' }
+        body = { 
+          status: action === 'approve' ? 'approved' : 'rejected',
+          ...(password && { overridePassword: password })
+        }
       }
       
       const res = await fetch(endpoint, {
@@ -86,16 +99,55 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
       
       const data = await res.json()
       
+      // Handle concurrent leave limit warning
+      if (res.status === 409 && data.error === 'concurrent_limit_exceeded') {
+        setOverrideModal({
+          show: true,
+          leaveId,
+          warning: data.warning,
+          currentCount: data.currentCount,
+          limit: data.limit
+        })
+        setProcessing(null)
+        return
+      }
+      
       if (res.ok && data.success) {
+        setOverrideModal(null)
+        setOverridePassword('')
         if (onLeaveUpdate) onLeaveUpdate()
+      } else if (res.status === 401 && password) {
+        // Invalid password for override
+        setPasswordError('Invalid password. Please try again.')
+        setProcessing(null)
       } else {
         setError(data.error || `Failed to ${action} leave`)
+        setProcessing(null)
       }
     } catch (err) {
       setError('Network error. Please try again.')
-    } finally {
       setProcessing(null)
+    } finally {
+      if (!overrideModal) {
+        setProcessing(null)
+      }
     }
+  }
+
+  const handlePasswordOverride = async () => {
+    if (!overrideModal || !overridePassword) {
+      setPasswordError('Please enter your password')
+      return
+    }
+    
+    await handleLeaveAction(overrideModal.leaveId, 'approve', overridePassword)
+  }
+
+  const cancelOverride = () => {
+    setOverrideModal(null)
+    setOverridePassword('')
+    setPasswordError('')
+    setProcessing(null)
   }
 
   // Helper to calculate working days (falls back to calendar days if not available)
@@ -429,6 +481,141 @@ export default function Dashboard({ user, leaves, token, onLeaveUpdate }: Dashbo
           </div>
         </div>
       </div>
+      
+      {/* Password Override Modal */}
+      {overrideModal?.show && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <h2 style={{ 
+              fontSize: '24px', 
+              fontWeight: 'bold', 
+              marginBottom: '16px',
+              color: '#ef4444'
+            }}>
+              ⚠️ Concurrent Leave Limit Warning
+            </h2>
+            
+            <div style={{
+              padding: '16px',
+              background: '#fef3c7',
+              border: '2px solid #f59e0b',
+              borderRadius: '8px',
+              marginBottom: '20px'
+            }}>
+              <p style={{ color: '#92400e', lineHeight: '1.6' }}>
+                {overrideModal.warning}
+              </p>
+              <p style={{ 
+                marginTop: '12px', 
+                color: '#92400e', 
+                fontWeight: '600',
+                fontSize: '14px'
+              }}>
+                Currently: {overrideModal.currentCount} / {overrideModal.limit} team members on leave
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ 
+                marginBottom: '12px', 
+                color: '#374151',
+                fontWeight: '500'
+              }}>
+                To approve this leave in emergency circumstances, please enter your password:
+              </p>
+              
+              <input
+                type="password"
+                placeholder="Enter your password"
+                value={overridePassword}
+                onChange={(e) => setOverridePassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handlePasswordOverride()}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+                autoFocus
+              />
+              
+              {passwordError && (
+                <p style={{ 
+                  color: '#dc2626', 
+                  fontSize: '14px', 
+                  marginTop: '8px',
+                  fontWeight: '500'
+                }}>
+                  {passwordError}
+                </p>
+              )}
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              justifyContent: 'flex-end' 
+            }}>
+              <button
+                onClick={cancelOverride}
+                disabled={processing !== null}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '2px solid #d1d5db',
+                  background: 'white',
+                  color: '#374151',
+                  fontWeight: '600',
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  opacity: processing ? 0.5 : 1,
+                  transition: 'all 0.2s'
+                }}
+              >
+                Cancel
+              </button>
+              
+              <button
+                onClick={handlePasswordOverride}
+                disabled={processing !== null || !overridePassword}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: processing ? '#9ca3af' : '#ef4444',
+                  color: 'white',
+                  fontWeight: '600',
+                  cursor: (processing || !overridePassword) ? 'not-allowed' : 'pointer',
+                  opacity: !overridePassword ? 0.5 : 1,
+                  transition: 'all 0.2s'
+                }}
+              >
+                {processing ? '⏳ Processing...' : '🔓 Override & Approve'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

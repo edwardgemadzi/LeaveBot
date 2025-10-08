@@ -705,7 +705,16 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
       return res.status(403).json({ error: 'Can only update settings for your own team' });
     }
 
-    const { concurrentLeave, annualLeaveDays, defaults } = req.body;
+    const { 
+      concurrentLeave, 
+      annualLeaveDays, 
+      maxConsecutiveDays,
+      minAdvanceNoticeDays,
+      carryOverDays,
+      allowNegativeBalance,
+      maxConcurrentLeave,
+      defaults 
+    } = req.body;
 
     // Validate defaults if provided (these are default shift settings for new team members)
     if (defaults) {
@@ -750,6 +759,41 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
       }
     }
 
+    // Validate max consecutive days
+    if (maxConsecutiveDays !== undefined) {
+      if (typeof maxConsecutiveDays !== 'number' || maxConsecutiveDays < 1 || maxConsecutiveDays > 365) {
+        return res.status(400).json({ error: 'Max consecutive days must be between 1 and 365' });
+      }
+    }
+
+    // Validate min advance notice days
+    if (minAdvanceNoticeDays !== undefined) {
+      if (typeof minAdvanceNoticeDays !== 'number' || minAdvanceNoticeDays < 0 || minAdvanceNoticeDays > 365) {
+        return res.status(400).json({ error: 'Min advance notice days must be between 0 and 365' });
+      }
+    }
+
+    // Validate carry over days
+    if (carryOverDays !== undefined) {
+      if (typeof carryOverDays !== 'number' || carryOverDays < 0 || carryOverDays > 365) {
+        return res.status(400).json({ error: 'Carry over days must be between 0 and 365' });
+      }
+    }
+
+    // Validate allow negative balance
+    if (allowNegativeBalance !== undefined) {
+      if (typeof allowNegativeBalance !== 'boolean') {
+        return res.status(400).json({ error: 'Allow negative balance must be a boolean' });
+      }
+    }
+
+    // Validate max concurrent leave
+    if (maxConcurrentLeave !== undefined) {
+      if (typeof maxConcurrentLeave !== 'number' || maxConcurrentLeave < 1 || maxConcurrentLeave > 50) {
+        return res.status(400).json({ error: 'Max concurrent leave must be between 1 and 50' });
+      }
+    }
+
     // Get current settings or defaults
     const currentSettings = team.settings || {
       concurrentLeave: {
@@ -759,6 +803,11 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
         checkByShift: false
       },
       annualLeaveDays: 21,
+      maxConsecutiveDays: 14,
+      minAdvanceNoticeDays: 7,
+      carryOverDays: 5,
+      allowNegativeBalance: false,
+      maxConcurrentLeave: 3,
       defaults: {
         shiftPattern: { type: 'regular' },
         shiftTime: { type: 'day' },
@@ -778,6 +827,11 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
     const updatedSettings = {
       concurrentLeave: concurrentLeave || currentSettings.concurrentLeave,
       annualLeaveDays: annualLeaveDays !== undefined ? annualLeaveDays : currentSettings.annualLeaveDays,
+      maxConsecutiveDays: maxConsecutiveDays !== undefined ? maxConsecutiveDays : (currentSettings.maxConsecutiveDays || 14),
+      minAdvanceNoticeDays: minAdvanceNoticeDays !== undefined ? minAdvanceNoticeDays : (currentSettings.minAdvanceNoticeDays || 7),
+      carryOverDays: carryOverDays !== undefined ? carryOverDays : (currentSettings.carryOverDays || 5),
+      allowNegativeBalance: allowNegativeBalance !== undefined ? allowNegativeBalance : (currentSettings.allowNegativeBalance || false),
+      maxConcurrentLeave: maxConcurrentLeave !== undefined ? maxConcurrentLeave : (currentSettings.maxConcurrentLeave || 3),
       defaults: defaults || currentSettings.defaults,
       updatedAt: new Date(),
       updatedBy: new ObjectId(decoded.id)
