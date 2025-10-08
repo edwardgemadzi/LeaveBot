@@ -23,6 +23,7 @@ function App() {
   const [name, setName] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
   const [leaves, setLeaves] = useState<any[]>([])
+  const [refreshKey, setRefreshKey] = useState(0) // Key to force UserManagement refresh
   const [employeeName, setEmployeeName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -556,7 +557,10 @@ function App() {
 
       {/* View Content */}
       {currentView === 'dashboard' && (
-        <Dashboard user={user} leaves={leaves} token={token} onLeaveUpdate={() => loadLeaves()} />
+        <Dashboard user={user} leaves={leaves} token={token} onLeaveUpdate={() => {
+          loadLeaves()
+          setRefreshKey(prev => prev + 1) // Force UserManagement to refresh
+        }} />
       )}
 
       {currentView === 'calendar' && user.role !== 'admin' && (
@@ -588,7 +592,7 @@ function App() {
       )}
 
       {currentView === 'team' && (user.role === 'admin' || user.role === 'leader') && (
-        <UserManagement currentUser={user} token={token} />
+        <UserManagement key={refreshKey} currentUser={user} token={token} />
       )}
 
       {currentView === 'team-settings' && user.role === 'leader' && (
