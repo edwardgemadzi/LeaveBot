@@ -96,7 +96,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({
           placeholder="Enter your team name (e.g., Marketing Team)"
           required
           disabled={loading}
-          helpText="A new team will be created for you"
+          helpText="A new team will be created for you as team leader"
         />
       )}
 
