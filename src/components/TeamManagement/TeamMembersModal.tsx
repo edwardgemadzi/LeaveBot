@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { Team, User } from '../../types'
 import { api } from '../../utils/api'
+import { getTeamId } from '../../utils/teamIdHelpers'
 
 interface TeamMembersModalProps {
   isOpen: boolean
@@ -43,14 +44,14 @@ export default function TeamMembersModal({
     if (isOpen) {
       loadMembers()
     }
-  }, [isOpen, team._id])
+  }, [isOpen, getTeamId(team)])
 
   const loadMembers = async () => {
     setLoading(true)
     setError('')
 
     try {
-      const data = await api.teams.getMembers(team._id, token)
+      const data = await api.teams.getMembers(getTeamId(team), token)
       setMembers(data.members || [])
     } catch (err) {
       setError('Failed to load team members')
@@ -63,7 +64,7 @@ export default function TeamMembersModal({
   const handleAssign = async () => {
     if (!selectedUserId) return
 
-    const result = await onAssignUser(team._id, selectedUserId)
+    const result = await onAssignUser(getTeamId(team), selectedUserId)
     if (result.success) {
       setSelectedUserId('')
       await loadMembers()
@@ -77,7 +78,7 @@ export default function TeamMembersModal({
       return
     }
 
-    const result = await onRemoveUser(team._id, userId)
+    const result = await onRemoveUser(getTeamId(team), userId)
     if (result.success) {
       await loadMembers()
     } else {

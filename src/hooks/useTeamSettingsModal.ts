@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Team } from '../types'
 import { api } from '../utils/api'
+import { getTeamId } from '../utils/teamIdHelpers'
 
 interface UseTeamSettingsModalParams {
   team: Team
@@ -62,7 +63,7 @@ export function useTeamSettingsModal({ team, isOpen, token, onSuccess, onClose }
     setError('')
     setSuccess('')
     try {
-      const data = await api.teams.updateSettings(team._id, {
+      const data = await api.teams.updateSettings(getTeamId(team), {
         concurrentLeave: settings.concurrentLeave,
         annualLeaveDays: settings.annualLeaveDays,
         defaults: settings.defaults

@@ -3,6 +3,7 @@
  */
 
 import { User } from '../types'
+import { areTeamIdsEqual } from './teamIdHelpers'
 
 /**
  * Check if current user can manage target user
@@ -15,11 +16,7 @@ export function canManageUser(currentUser: User, targetUser: User): boolean {
 
   // Leaders can only manage regular users in their team
   if (currentUser.role === 'leader') {
-    // Convert teamId to string for comparison (in case it's an ObjectId)
-    const currentUserTeamId = currentUser.teamId?.toString()
-    const targetUserTeamId = targetUser.teamId?.toString()
-    
-    return targetUser.role === 'user' && currentUserTeamId === targetUserTeamId
+    return targetUser.role === 'user' && areTeamIdsEqual(currentUser.teamId, targetUser.teamId)
   }
 
   return false

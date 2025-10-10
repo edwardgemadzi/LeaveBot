@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../../utils/api'
+import { getTeamId } from '../../utils/teamIdHelpers'
 import TeamSettingsHeader from './TeamSettingsHeader'
 import TeamSettingsTabs from './TeamSettingsTabs'
 import ConcurrentLimitsTab from './ConcurrentLimitsTab'
@@ -66,7 +67,7 @@ export default function TeamSettingsModal({ isOpen, onClose, team, token, onSucc
     setSuccess('')
 
     try {
-      const data = await api.teams.updateSettings(team._id, {
+      const data = await api.teams.updateSettings(getTeamId(team), {
         concurrentLeave: settings.concurrentLeave,
         annualLeaveDays: settings.annualLeaveDays,
         defaults: settings.defaults

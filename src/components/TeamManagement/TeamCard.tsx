@@ -4,6 +4,7 @@
 
 import { Team, User } from '../../types'
 import { getTeamMemberCount, formatTeamDate } from '../../utils/teamHelpers'
+import { isUserInTeam } from '../../utils/teamIdHelpers'
 
 interface TeamCardProps {
   team: Team
@@ -25,7 +26,8 @@ export default function TeamCard({
   onDelete,
 }: TeamCardProps) {
   const memberCount = getTeamMemberCount(team)
-  const isOwnTeam = currentUser.teamId === team._id
+  // Use utility function for consistent team ID comparison
+  const isOwnTeam = isUserInTeam(currentUser.teamId, team)
 
   return (
     <div
