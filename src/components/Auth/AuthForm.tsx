@@ -80,10 +80,10 @@ export const AuthForm: React.FC<AuthFormProps> = ({
           required
           disabled={loading}
           options={[
-            { value: 'user', label: 'Team Member' },
-            { value: 'leader', label: 'Team Leader' }
+            { value: 'user', label: 'User' },
+            { value: 'leader', label: 'Supervisor' }
           ]}
-          helpText="Choose your role in the organization"
+          helpText="Choose your role: User (team member) or Supervisor (team leader)"
         />
       )}
 
@@ -96,7 +96,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({
           placeholder="Enter your team name (e.g., Marketing Team)"
           required
           disabled={loading}
-          helpText="A new team will be created for you"
+          helpText="A new team will be created for you as supervisor"
         />
       )}
 
