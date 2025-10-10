@@ -1,3 +1,4 @@
+import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin, connectToDatabase } from '../lib/shared/mongodb-storage.js';
@@ -5,6 +6,9 @@ import { rateLimiters } from '../lib/shared/rate-limiter.js';
 import { logger } from '../lib/shared/logger.js';
 import { validateUsername, validatePassword, validateName } from '../lib/shared/validators.js';
 import { getDefaultTeamSettings } from '../lib/shared/working-days.js';
+
+// Load environment variables
+dotenv.config();
 
 // Initialize admin on cold start
 initializeAdmin();
@@ -85,7 +89,6 @@ export default async function handler(req, res) {
   }
 
   // Handle team creation for leaders
-  let resolvedTeamId = teamId;
   if (role === 'leader') {
     if (!teamName || teamName.trim().length === 0) {
       return res.status(400).json({ error: 'Team name is required for team leaders' });
@@ -93,8 +96,7 @@ export default async function handler(req, res) {
 
     try {
       // Connect to database and get teams collection
-      const client = await connectToDatabase();
-      const db = client.db('leavebot');
+      const { client, db } = await connectToDatabase();
       const teamsCollection = db.collection('teams');
 
       // Check if team name already exists
@@ -188,8 +190,7 @@ export default async function handler(req, res) {
   if (role === 'leader' && resolvedTeamId) {
     try {
       const { ObjectId } = await import('mongodb');
-      const client = await connectToDatabase();
-      const db = client.db('leavebot');
+      const { client, db } = await connectToDatabase();
       const teamsCollection = db.collection('teams');
       
       await teamsCollection.updateOne(
