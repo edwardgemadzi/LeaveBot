@@ -1,11 +1,7 @@
 import React from 'react';
-import DashboardRefactored from '../DashboardRefactored';
-import InteractiveCalendar from '../InteractiveCalendar';
-import UserManagementRefactored from '../UserManagementRefactored';
-import TeamManagementRefactored from '../TeamManagementRefactored';
-import TeamLeaveSettings from '../TeamLeaveSettings';
-import LeaveRequestForm from '../Leaves/LeaveRequestForm';
-import { LeaveListView } from './LeaveListView';
+import AdminPage from '../AdminPage';
+import LeaderPage from '../LeaderPage';
+import UserPage from '../UserPage';
 
 type View = 'dashboard' | 'calendar' | 'list' | 'team' | 'teams' | 'team-settings';
 
@@ -71,81 +67,47 @@ export const AppContent: React.FC<AppContentProps> = ({
   showToast,
   showError
 }) => {
+  // Render role-specific pages
+  if (user.role === 'admin') {
+    return (
+      <AdminPage
+        user={user}
+        token={token}
+        currentView={currentView as 'dashboard' | 'list' | 'teams' | 'team' | 'team-settings'}
+        onViewChange={onViewChange as (view: 'dashboard' | 'list' | 'teams' | 'team' | 'team-settings') => void}
+      />
+    );
+  }
+
+  if (user.role === 'leader') {
+    return (
+      <LeaderPage
+        user={user}
+        token={token}
+        currentView={currentView as 'dashboard' | 'calendar' | 'list' | 'team'}
+        onViewChange={onViewChange as (view: 'dashboard' | 'calendar' | 'list' | 'team') => void}
+      />
+    );
+  }
+
+  if (user.role === 'user') {
+    return (
+      <UserPage
+        user={user}
+        token={token}
+        currentView={currentView as 'dashboard' | 'calendar' | 'list'}
+        onViewChange={onViewChange as (view: 'dashboard' | 'calendar' | 'list') => void}
+      />
+    );
+  }
+
+  // Fallback for unknown roles
   return (
-    <div className="max-w-[1400px] mx-auto p-7">
-      {currentView === 'dashboard' && (
-        <DashboardRefactored
-          leaves={leaves}
-          user={user}
-          token={token}
-          onLeaveUpdate={onLeaveUpdate}
-        />
-      )}
-
-      {currentView === 'calendar' && (
-        <InteractiveCalendar
-          leaves={leaves}
-          user={user}
-          userSettings={userSettings}
-          token={token}
-          teamMembers={teamMembers}
-          onRefresh={onLeaveUpdate}
-          showToast={showToast}
-          showError={showError}
-        />
-      )}
-
-      {currentView === 'list' && (
-        <LeaveListView
-          leaves={leaves}
-          loading={leavesLoading}
-          filteredLeaves={filteredLeaves}
-          searchFilter={searchFilter}
-          onFilterChange={onFilterChange}
-          onViewChange={onViewChange}
-          isAdmin={isAdmin}
-          onStatusUpdate={onStatusUpdate}
-          token={token}
-          showToast={showToast}
-          showError={showError}
-          user={user}
-        />
-      )}
-
-      {/* Form is now handled as a popup in the calendar */}
-
-      {/* Role-based content */}
-      {user.role === 'admin' && (
-        <>
-          {/* Admin: Leaders tab */}
-          {currentView === 'team' && (
-            <UserManagementRefactored currentUser={user} token={token} teams={teams} />
-          )}
-          {/* Admin: Teams tab */}
-          {currentView === 'teams' && (
-            <TeamManagementRefactored currentUser={user} token={token} />
-          )}
-          {/* Admin: Users tab */}
-          {currentView === 'team-settings' && (
-            <UserManagementRefactored currentUser={user} token={token} teams={teams} />
-          )}
-        </>
-      )}
-
-      {user.role === 'leader' && (
-        <>
-          {/* Leader: Team Management tab */}
-          {currentView === 'team' && (
-            <UserManagementRefactored currentUser={user} token={token} teams={teams} />
-          )}
-        </>
-      )}
-
-      {user.role === 'user' && (
-        <>
-          {/* Users don't have additional tabs beyond dashboard, calendar, and request history */}
-        </>
-      )}
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Unknown Role</h2>
+        <p className="text-gray-600">Your role is not recognized. Please contact an administrator.</p>
+      </div>
     </div>
   );
 };
