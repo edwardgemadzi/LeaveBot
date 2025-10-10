@@ -124,6 +124,7 @@ export default function TeamManagement({
   }
 
   return (
+    <>
     <TeamManagementLayout
       currentUser={currentUser}
       teams={teams}
@@ -164,5 +165,6 @@ export default function TeamManagement({
         token={token}
       />
     )}
+  </>
   )
 }
