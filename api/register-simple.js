@@ -49,19 +49,16 @@ export default async function handler(req, res) {
     const nameValidation = validateName(name, false);
     const validName = nameValidation.valid ? nameValidation.value : usernameValidation.value;
 
-    // Connect to database once for the entire operation
-    const client = await connectDB();
-    const db = client.db('leavebot');
-    const usersCollection = db.collection('users');
-    const teamsCollection = db.collection('teams');
-
     // Handle team creation for leaders
     let teamId = null;
     if (role === 'leader') {
       if (!teamName || teamName.trim().length === 0) {
-        await client.close();
         return res.status(400).json({ error: 'Team name is required for team leaders' });
       }
+
+      const client = await connectDB();
+      const db = client.db('leavebot');
+      const teamsCollection = db.collection('teams');
 
       // Check if team name already exists
       const existingTeam = await teamsCollection.findOne({ name: teamName.trim() });
@@ -83,6 +80,8 @@ export default async function handler(req, res) {
       const teamResult = await teamsCollection.insertOne(newTeam);
       teamId = teamResult.insertedId;
 
+      await client.close();
+
       logger.info('Team created for new leader during registration', {
         teamId: teamId.toString(),
         teamName: teamName.trim(),
@@ -91,6 +90,9 @@ export default async function handler(req, res) {
     }
 
     // Check if user already exists
+    const client = await connectDB();
+    const db = client.db('leavebot');
+    const usersCollection = db.collection('users');
 
     const existingUser = await usersCollection.findOne({ username: usernameValidation.value });
     if (existingUser) {
@@ -114,6 +116,7 @@ export default async function handler(req, res) {
 
     // Update team if this is a leader
     if (role === 'leader' && teamId) {
+      const teamsCollection = db.collection('teams');
       await teamsCollection.updateOne(
         { _id: teamId },
         { 
