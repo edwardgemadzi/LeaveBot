@@ -13,7 +13,7 @@ import { useTeamOperations } from '../hooks/useTeamOperations'
 import { useLeaveActions } from '../hooks/useLeaveActions'
 import { useToast } from '../hooks/useToast'
 import { UserManagementRefactored } from './UserManagement'
-import { TeamManagementRefactored } from './TeamManagementRefactored'
+import TeamManagementRefactored from './TeamManagementRefactored'
 import { LeaveListView } from './App/LeaveListView'
 import DashboardRefactored from './DashboardRefactored'
 
