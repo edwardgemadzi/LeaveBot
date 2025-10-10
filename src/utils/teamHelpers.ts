@@ -16,7 +16,15 @@ export function canManageTeams(user: User): boolean {
  */
 export function canEditTeam(user: User, team: Team): boolean {
   if (user.role === 'admin') return true
-  if (user.role === 'leader' && team.leaderId === user.id) return true
+  if (user.role === 'leader') {
+    // Handle both ObjectId and string comparison
+    const userTeamId = user.teamId?.toString()
+    const teamId = team.id?.toString() || team._id?.toString()
+    const teamLeaderId = team.leaderId?.toString()
+    
+    // Leader can edit if they are the leader of this team OR if this is their team
+    return teamLeaderId === user.id?.toString() || userTeamId === teamId
+  }
   return false
 }
 

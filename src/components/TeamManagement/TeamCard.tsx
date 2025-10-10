@@ -143,6 +143,25 @@ export default function TeamCard({
           </button>
         ) : null}
 
+        {/* Settings button - leaders can access settings for their own team, admins for all teams */}
+        {((currentUser.role === 'leader' && isOwnTeam) || currentUser.role === 'admin') && (
+          <button
+            onClick={onSettings}
+            style={{
+              padding: '8px 12px',
+              background: '#8b5cf6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '500',
+            }}
+          >
+            ⚙️ Settings
+          </button>
+        )}
+
         {canEdit && (
           <>
             <button
@@ -159,21 +178,6 @@ export default function TeamCard({
               }}
             >
               ✏️ Edit
-            </button>
-            <button
-              onClick={onSettings}
-              style={{
-                padding: '8px 12px',
-                background: '#8b5cf6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: '500',
-              }}
-            >
-              ⚙️ Settings
             </button>
             {currentUser.role === 'admin' && (
               <button
