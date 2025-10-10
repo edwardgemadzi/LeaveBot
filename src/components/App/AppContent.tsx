@@ -114,16 +114,37 @@ export const AppContent: React.FC<AppContentProps> = ({
 
       {/* Form is now handled as a popup in the calendar */}
 
-      {currentView === 'team' && isAdmin && (
-        <UserManagementRefactored currentUser={user} token={token} teams={teams} />
+      {/* Role-based content */}
+      {user.role === 'admin' && (
+        <>
+          {/* Admin: Leaders tab */}
+          {currentView === 'team' && (
+            <UserManagementRefactored currentUser={user} token={token} teams={teams} />
+          )}
+          {/* Admin: Teams tab */}
+          {currentView === 'teams' && (
+            <TeamManagementRefactored currentUser={user} token={token} />
+          )}
+          {/* Admin: Users tab */}
+          {currentView === 'team-settings' && (
+            <UserManagementRefactored currentUser={user} token={token} teams={teams} />
+          )}
+        </>
       )}
 
-      {currentView === 'teams' && isAdmin && (
-        <TeamManagementRefactored currentUser={user} token={token} />
+      {user.role === 'leader' && (
+        <>
+          {/* Leader: Team Management tab */}
+          {currentView === 'team' && (
+            <UserManagementRefactored currentUser={user} token={token} teams={teams} />
+          )}
+        </>
       )}
 
-      {currentView === 'team-settings' && isAdmin && (
-        <TeamLeaveSettings user={user} token={token} />
+      {user.role === 'user' && (
+        <>
+          {/* Users don't have additional tabs beyond dashboard, calendar, and request history */}
+        </>
       )}
     </div>
   );

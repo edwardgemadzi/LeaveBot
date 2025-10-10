@@ -7,12 +7,14 @@ interface AppNavigationProps {
   currentView: View;
   onViewChange: (view: View) => void;
   isAdmin: boolean;
+  userRole: string;
 }
 
 export const AppNavigation: React.FC<AppNavigationProps> = ({
   currentView,
   onViewChange,
-  isAdmin
+  isAdmin,
+  userRole
 }) => {
   return (
     <div className="bg-white border-b border-slate-200 py-4 px-7">
@@ -23,25 +25,15 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({
           icon="📊"
           label="Dashboard"
         />
-        <NavTab
-          active={currentView === 'calendar'}
-          onClick={() => onViewChange('calendar')}
-          icon="📅"
-          label="Calendar"
-        />
-        <NavTab
-          active={currentView === 'list'}
-          onClick={() => onViewChange('list')}
-          icon="📋"
-          label="My Requests"
-        />
-        {isAdmin && (
+        
+        {userRole === 'admin' ? (
+          // Admin tabs: Dashboard, Requests, Teams, Leaders, Users
           <>
             <NavTab
-              active={currentView === 'team'}
-              onClick={() => onViewChange('team')}
-              icon="👥"
-              label="Team Members"
+              active={currentView === 'list'}
+              onClick={() => onViewChange('list')}
+              icon="📋"
+              label="Requests"
             />
             <NavTab
               active={currentView === 'teams'}
@@ -50,10 +42,54 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({
               label="Teams"
             />
             <NavTab
+              active={currentView === 'team'}
+              onClick={() => onViewChange('team')}
+              icon="👑"
+              label="Leaders"
+            />
+            <NavTab
               active={currentView === 'team-settings'}
               onClick={() => onViewChange('team-settings')}
-              icon="⚙️"
-              label="Team Settings"
+              icon="👥"
+              label="Users"
+            />
+          </>
+        ) : userRole === 'leader' ? (
+          // Leader tabs: Dashboard, Calendar, Requests, Team Management
+          <>
+            <NavTab
+              active={currentView === 'calendar'}
+              onClick={() => onViewChange('calendar')}
+              icon="📅"
+              label="Calendar"
+            />
+            <NavTab
+              active={currentView === 'list'}
+              onClick={() => onViewChange('list')}
+              icon="📋"
+              label="Requests"
+            />
+            <NavTab
+              active={currentView === 'team'}
+              onClick={() => onViewChange('team')}
+              icon="👥"
+              label="Team Management"
+            />
+          </>
+        ) : (
+          // User tabs: Dashboard, Calendar, Request History
+          <>
+            <NavTab
+              active={currentView === 'calendar'}
+              onClick={() => onViewChange('calendar')}
+              icon="📅"
+              label="Calendar"
+            />
+            <NavTab
+              active={currentView === 'list'}
+              onClick={() => onViewChange('list')}
+              icon="📋"
+              label="Request History"
             />
           </>
         )}

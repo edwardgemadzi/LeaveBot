@@ -97,6 +97,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         currentView={currentView}
         onViewChange={onViewChange}
         isAdmin={isAdmin}
+        userRole={user.role}
       />
 
       <AppContent
