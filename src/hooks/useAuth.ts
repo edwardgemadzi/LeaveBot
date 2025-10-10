@@ -96,7 +96,7 @@ export function useAuth() {
       // Clean username (remove @ prefix)
       const cleanUsername = username.replace(/^@+/, '')
 
-      const data = await api.auth.register(cleanUsername, password, name, teamId, teamToken, teamName)
+      const data = await api.auth.register(cleanUsername, password, name, teamId, teamToken, teamName, role)
 
       if (data.success && data.token && data.user) {
         const userWithId = {

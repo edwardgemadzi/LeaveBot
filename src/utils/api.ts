@@ -78,10 +78,10 @@ export const api = {
         body: JSON.stringify({ username, password }),
       }),
 
-    register: (username: string, password: string, name: string, teamId?: string, teamToken?: string, teamName?: string) =>
+    register: (username: string, password: string, name: string, teamId?: string, teamToken?: string, teamName?: string, role?: string) =>
       apiFetch<ApiResult<{ token: string; user: import('../types').User }>>('/api/register', {
         method: 'POST',
-        body: JSON.stringify({ username, password, name, teamId, teamToken, teamName }),
+        body: JSON.stringify({ username, password, name, teamId, teamToken, teamName, role }),
       }),
   },
 
