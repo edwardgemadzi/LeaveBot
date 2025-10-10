@@ -13,15 +13,6 @@ import {
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-let cachedClient = null;
-
-async function connectToDatabase() {
-  if (cachedClient) return cachedClient;
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  cachedClient = client;
-  return client;
-}
 
 export default async (req, res) => {
   const startTime = Date.now();
@@ -212,6 +203,10 @@ async function handleGetTeamDetails(req, res, decoded, startTime, teamId) {
 // POST /api/teams - Create new team
 async function handleCreateTeam(req, res, decoded, startTime) {
   const rateLimitResult = rateLimiters.mutation(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for create team', { userId: decoded.id });
     return res.status(429).json({ success: false, error: rateLimitResult.message });
@@ -304,6 +299,10 @@ async function handleCreateTeam(req, res, decoded, startTime) {
 // PUT /api/teams?id={teamId} - Update team
 async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for update team', { userId: decoded.id, teamId });
     return res.status(429).json({ success: false, error: rateLimitResult.message });
@@ -408,6 +407,10 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
 // DELETE /api/teams?id={teamId} - Delete team
 async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for delete team', { userId: decoded.id, teamId });
     return res.status(429).json({ success: false, error: rateLimitResult.message });
@@ -473,6 +476,10 @@ async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
 // POST /api/teams?id={teamId}&action=assign - Assign user to team
 async function handleAssignUser(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for assign user', { userId: decoded.id, teamId });
     return res.status(429).json({ success: false, error: rateLimitResult.message });
@@ -555,6 +562,10 @@ async function handleAssignUser(req, res, decoded, startTime, teamId) {
 // POST /api/teams?id={teamId}&action=remove - Remove user from team
 async function handleRemoveUser(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for remove user', { userId: decoded.id, teamId });
     return res.status(429).json({ success: false, error: rateLimitResult.message });
@@ -677,6 +688,10 @@ async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
 // PUT /api/teams?id={teamId}&action=settings - Update team settings
 async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for update team settings', { userId: decoded.id, teamId });
     return res.status(429).json({ success: false, error: rateLimitResult.message });

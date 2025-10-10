@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Team } from '../types'
+import { api } from '../utils/api'
 
 interface UseTeamSettingsModalParams {
   team: Team
@@ -61,20 +62,13 @@ export function useTeamSettingsModal({ team, isOpen, token, onSuccess, onClose }
     setError('')
     setSuccess('')
     try {
-      const res = await fetch(`/api/teams?id=${team._id}&action=settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          concurrentLeave: settings.concurrentLeave,
-          annualLeaveDays: settings.annualLeaveDays,
-          defaults: settings.defaults
-        })
-      })
-      const data = await res.json()
-      if (res.ok && data.success) {
+      const data = await api.teams.updateSettings(team._id, {
+        concurrentLeave: settings.concurrentLeave,
+        annualLeaveDays: settings.annualLeaveDays,
+        defaults: settings.defaults
+      }, token)
+      
+      if (data.success) {
         setSuccess('Settings saved successfully!')
         setTimeout(() => {
           onSuccess()

@@ -43,10 +43,10 @@ export default function TeamLeaveSettings({ user, token }: TeamLeaveSettingsProp
         return
       }
       
-      setTeamId(leaderTeam.id || leaderTeam._id)
+      setTeamId(leaderTeam._id)
       
       // Now load the team settings
-      const settingsData = await api.teams.getSettings(leaderTeam.id || leaderTeam._id, token)
+      const settingsData = await api.teams.getSettings(leaderTeam._id, token)
       if (settingsData.settings) setTeamSettings(settingsData.settings)
     } catch (err) {
       console.error('Failed to load team settings:', err)
