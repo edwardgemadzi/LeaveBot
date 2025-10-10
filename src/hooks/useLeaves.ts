@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { api, ApiError } from '../utils/api'
+import { normalizeLeave } from '../utils/normalize'
 import { Leave } from '../types'
 
 export function useLeaves(token: string, autoLoad = true) {
@@ -20,7 +21,8 @@ export function useLeaves(token: string, autoLoad = true) {
     try {
       const data = await api.leaves.getAll(token)
       if (data.success) {
-        setLeaves(data.leaves)
+        const normalized = (data.leaves as Leave[]).map(normalizeLeave)
+        setLeaves(normalized)
       } else {
         setError(data.error || 'Failed to load leaves')
       }

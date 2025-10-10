@@ -1,5 +1,6 @@
 import { MongoClient, ObjectId } from 'mongodb';
 import jwt from 'jsonwebtoken';
+import { connectToDatabase } from '../lib/shared/mongodb-storage.js';
 import { rateLimiters } from '../lib/shared/rate-limiter.js';
 import { logger } from '../lib/shared/logger.js';
 import { validateObjectId, validateTeamName, sanitizeString } from '../lib/shared/validators.js';
@@ -37,7 +38,7 @@ export default async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     logger.warn('Missing or invalid authorization header', { method: req.method, path: req.url });
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
   const token = authHeader.substring(7);
@@ -46,13 +47,13 @@ export default async (req, res) => {
     decoded = jwt.verify(token, JWT_SECRET);
   } catch (err) {
     logger.warn('Invalid JWT token', { error: err.message });
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ success: false, error: 'Invalid token' });
   }
 
   // Only admins and leaders can access teams
   if (!['admin', 'leader'].includes(decoded.role)) {
     logger.warn('Forbidden team access', { userId: decoded.id, role: decoded.role });
-    return res.status(403).json({ error: 'Access denied' });
+    return res.status(403).json({ success: false, error: 'Access denied' });
   }
 
   const { id: teamId, action } = req.query;
@@ -80,7 +81,7 @@ export default async (req, res) => {
     } else if (req.method === 'DELETE') {
       return await handleDeleteTeam(req, res, decoded, startTime, teamId);
     } else {
-      return res.status(405).json({ error: 'Method not allowed' });
+      return res.status(405).json({ success: false, error: 'Method not allowed' });
     }
   } catch (err) {
     const duration = Date.now() - startTime;
@@ -91,7 +92,7 @@ export default async (req, res) => {
       userId: decoded.id,
       duration
     });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
@@ -100,7 +101,7 @@ async function handleListTeams(req, res, decoded, startTime) {
   const rateLimitResult = rateLimiters.read(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for list teams', { userId: decoded.id });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   try {
@@ -139,11 +140,11 @@ async function handleListTeams(req, res, decoded, startTime) {
     const duration = Date.now() - startTime;
     logger.response(req, res, duration, { teamCount: teamsWithDetails.length });
 
-    return res.status(200).json({ teams: teamsWithDetails });
+    return res.status(200).json({ success: true, teams: teamsWithDetails });
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error listing teams', { error: err.message, userId: decoded.id, duration });
-    return res.status(500).json({ error: 'Failed to list teams' });
+    return res.status(500).json({ success: false, error: 'Failed to list teams' });
   }
 }
 
@@ -152,12 +153,12 @@ async function handleGetTeamDetails(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.read(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for get team details', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
   if (!teamIdValidation.valid) {
-    return res.status(400).json({ error: teamIdValidation.error });
+    return res.status(400).json({ success: false, error: teamIdValidation.error });
   }
 
   try {
@@ -168,13 +169,13 @@ async function handleGetTeamDetails(req, res, decoded, startTime, teamId) {
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
     // Leaders can only view their own teams
     if (decoded.role === 'leader' && team.leaderId?.toString() !== decoded.id) {
       logger.warn('Leader attempted to view another team', { userId: decoded.id, teamId });
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
     const leader = team.leaderId
@@ -190,6 +191,7 @@ async function handleGetTeamDetails(req, res, decoded, startTime, teamId) {
     logger.response(req, res, duration, { teamId, memberCount: members.length });
 
     return res.status(200).json({
+      success: true,
       team: {
         _id: team._id,
         name: team.name,
@@ -203,7 +205,7 @@ async function handleGetTeamDetails(req, res, decoded, startTime, teamId) {
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error getting team details', { error: err.message, teamId, userId: decoded.id, duration });
-    return res.status(500).json({ error: 'Failed to get team details' });
+    return res.status(500).json({ success: false, error: 'Failed to get team details' });
   }
 }
 
@@ -212,13 +214,13 @@ async function handleCreateTeam(req, res, decoded, startTime) {
   const rateLimitResult = rateLimiters.mutation(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for create team', { userId: decoded.id });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   // Only admins can create teams
   if (decoded.role !== 'admin') {
     logger.warn('Non-admin attempted to create team', { userId: decoded.id, role: decoded.role });
-    return res.status(403).json({ error: 'Only admins can create teams' });
+    return res.status(403).json({ success: false, error: 'Only admins can create teams' });
   }
 
   const { name, description, leaderId } = req.body;
@@ -226,14 +228,14 @@ async function handleCreateTeam(req, res, decoded, startTime) {
   // Validate team name
   const nameValidation = validateTeamName(name);
   if (!nameValidation.valid) {
-    return res.status(400).json({ error: nameValidation.error });
+    return res.status(400).json({ success: false, error: nameValidation.error });
   }
 
   // Validate leader ID if provided
   if (leaderId) {
     const leaderIdValidation = validateObjectId(leaderId);
     if (!leaderIdValidation.valid) {
-      return res.status(400).json({ error: 'Invalid leader ID format' });
+      return res.status(400).json({ success: false, error: 'Invalid leader ID format' });
     }
   }
 
@@ -248,17 +250,17 @@ async function handleCreateTeam(req, res, decoded, startTime) {
     // Check if team name already exists
     const existingTeam = await teamsCollection.findOne({ name: nameValidation.value });
     if (existingTeam) {
-      return res.status(400).json({ error: 'Team name already exists' });
+      return res.status(400).json({ success: false, error: 'Team name already exists' });
     }
 
     // Verify leader exists and is a leader role
     if (leaderId) {
       const leader = await usersCollection.findOne({ _id: new ObjectId(leaderId) });
       if (!leader) {
-        return res.status(400).json({ error: 'Leader not found' });
+        return res.status(400).json({ success: false, error: 'Leader not found' });
       }
       if (leader.role !== 'leader') {
-        return res.status(400).json({ error: 'Selected user is not a leader' });
+        return res.status(400).json({ success: false, error: 'Selected user is not a leader' });
       }
     }
 
@@ -283,6 +285,7 @@ async function handleCreateTeam(req, res, decoded, startTime) {
     });
 
     return res.status(201).json({
+      success: true,
       message: 'Team created successfully',
       team: {
         _id: result.insertedId,
@@ -294,7 +297,7 @@ async function handleCreateTeam(req, res, decoded, startTime) {
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error creating team', { error: err.message, userId: decoded.id, duration });
-    return res.status(500).json({ error: 'Failed to create team' });
+    return res.status(500).json({ success: false, error: 'Failed to create team' });
   }
 }
 
@@ -303,18 +306,18 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for update team', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   // Only admins can update teams
   if (decoded.role !== 'admin') {
     logger.warn('Non-admin attempted to update team', { userId: decoded.id, role: decoded.role });
-    return res.status(403).json({ error: 'Only admins can update teams' });
+    return res.status(403).json({ success: false, error: 'Only admins can update teams' });
   }
 
   const teamIdValidation = validateObjectId(teamId);
   if (!teamIdValidation.valid) {
-    return res.status(400).json({ error: teamIdValidation.error });
+    return res.status(400).json({ success: false, error: teamIdValidation.error });
   }
 
   const { name, description, leaderId } = req.body;
@@ -324,7 +327,7 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
   if (name !== undefined) {
     const nameValidation = validateTeamName(name);
     if (!nameValidation.valid) {
-      return res.status(400).json({ error: nameValidation.error });
+      return res.status(400).json({ success: false, error: nameValidation.error });
     }
     updateData.name = nameValidation.value;
   }
@@ -341,14 +344,14 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
     } else {
       const leaderIdValidation = validateObjectId(leaderId);
       if (!leaderIdValidation.valid) {
-        return res.status(400).json({ error: 'Invalid leader ID format' });
+        return res.status(400).json({ success: false, error: 'Invalid leader ID format' });
       }
       updateData.leaderId = new ObjectId(leaderId);
     }
   }
 
   if (Object.keys(updateData).length === 0) {
-    return res.status(400).json({ error: 'No valid update fields provided' });
+    return res.status(400).json({ success: false, error: 'No valid update fields provided' });
   }
 
   try {
@@ -359,14 +362,14 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
     // Check if new name conflicts with existing team
     if (updateData.name && updateData.name !== team.name) {
       const existingTeam = await teamsCollection.findOne({ name: updateData.name });
       if (existingTeam) {
-        return res.status(400).json({ error: 'Team name already exists' });
+        return res.status(400).json({ success: false, error: 'Team name already exists' });
       }
     }
 
@@ -374,10 +377,10 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
     if (updateData.leaderId && updateData.leaderId !== null) {
       const leader = await usersCollection.findOne({ _id: updateData.leaderId });
       if (!leader) {
-        return res.status(400).json({ error: 'Leader not found' });
+        return res.status(400).json({ success: false, error: 'Leader not found' });
       }
       if (leader.role !== 'leader') {
-        return res.status(400).json({ error: 'Selected user is not a leader' });
+        return res.status(400).json({ success: false, error: 'Selected user is not a leader' });
       }
     }
 
@@ -394,11 +397,11 @@ async function handleUpdateTeam(req, res, decoded, startTime, teamId) {
       duration
     });
 
-    return res.status(200).json({ message: 'Team updated successfully' });
+    return res.status(200).json({ success: true, message: 'Team updated successfully' });
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error updating team', { error: err.message, teamId, userId: decoded.id, duration });
-    return res.status(500).json({ error: 'Failed to update team' });
+    return res.status(500).json({ success: false, error: 'Failed to update team' });
   }
 }
 
@@ -407,18 +410,18 @@ async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for delete team', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   // Only admins can delete teams
   if (decoded.role !== 'admin') {
     logger.warn('Non-admin attempted to delete team', { userId: decoded.id, role: decoded.role });
-    return res.status(403).json({ error: 'Only admins can delete teams' });
+    return res.status(403).json({ success: false, error: 'Only admins can delete teams' });
   }
 
   const teamIdValidation = validateObjectId(teamId);
   if (!teamIdValidation.valid) {
-    return res.status(400).json({ error: teamIdValidation.error });
+    return res.status(400).json({ success: false, error: teamIdValidation.error });
   }
 
   try {
@@ -430,7 +433,7 @@ async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
     // Get all users in this team
@@ -459,11 +462,11 @@ async function handleDeleteTeam(req, res, decoded, startTime, teamId) {
       duration
     });
 
-    return res.status(200).json({ message: 'Team deleted successfully' });
+    return res.status(200).json({ success: true, message: 'Team deleted successfully' });
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error deleting team', { error: err.message, teamId, userId: decoded.id, duration });
-    return res.status(500).json({ error: 'Failed to delete team' });
+    return res.status(500).json({ success: false, error: 'Failed to delete team' });
   }
 }
 
@@ -472,18 +475,18 @@ async function handleAssignUser(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for assign user', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
   if (!teamIdValidation.valid) {
-    return res.status(400).json({ error: teamIdValidation.error });
+    return res.status(400).json({ success: false, error: teamIdValidation.error });
   }
 
   const { userId } = req.body;
   const userIdValidation = validateObjectId(userId);
   if (!userIdValidation.valid) {
-    return res.status(400).json({ error: 'Invalid user ID format' });
+    return res.status(400).json({ success: false, error: 'Invalid user ID format' });
   }
 
   try {
@@ -494,23 +497,23 @@ async function handleAssignUser(req, res, decoded, startTime, teamId) {
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
     // Leaders can only assign to their own teams
     if (decoded.role === 'leader' && team.leaderId?.toString() !== decoded.id) {
       logger.warn('Leader attempted to assign user to another team', { userId: decoded.id, teamId });
-      return res.status(403).json({ error: 'Can only assign users to your own team' });
+      return res.status(403).json({ success: false, error: 'Can only assign users to your own team' });
     }
 
     const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
     // Check if user is already in this team
     if (user.teamId?.toString() === teamId) {
-      return res.status(400).json({ error: 'User is already in this team' });
+      return res.status(400).json({ success: false, error: 'User is already in this team' });
     }
 
     // Assign user to team
@@ -541,11 +544,11 @@ async function handleAssignUser(req, res, decoded, startTime, teamId) {
       duration
     });
 
-    return res.status(200).json({ message: 'User assigned successfully' });
+    return res.status(200).json({ success: true, message: 'User assigned successfully' });
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error assigning user', { error: err.message, teamId, userId: req.body.userId, duration });
-    return res.status(500).json({ error: 'Failed to assign user' });
+    return res.status(500).json({ success: false, error: 'Failed to assign user' });
   }
 }
 
@@ -554,18 +557,18 @@ async function handleRemoveUser(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for remove user', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
   if (!teamIdValidation.valid) {
-    return res.status(400).json({ error: teamIdValidation.error });
+    return res.status(400).json({ success: false, error: teamIdValidation.error });
   }
 
   const { userId } = req.body;
   const userIdValidation = validateObjectId(userId);
   if (!userIdValidation.valid) {
-    return res.status(400).json({ error: 'Invalid user ID format' });
+    return res.status(400).json({ success: false, error: 'Invalid user ID format' });
   }
 
   try {
@@ -576,23 +579,23 @@ async function handleRemoveUser(req, res, decoded, startTime, teamId) {
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
     // Leaders can only remove from their own teams
     if (decoded.role === 'leader' && team.leaderId?.toString() !== decoded.id) {
       logger.warn('Leader attempted to remove user from another team', { userId: decoded.id, teamId });
-      return res.status(403).json({ error: 'Can only remove users from your own team' });
+      return res.status(403).json({ success: false, error: 'Can only remove users from your own team' });
     }
 
     const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
     // Check if user is in this team
     if (user.teamId?.toString() !== teamId) {
-      return res.status(400).json({ error: 'User is not in this team' });
+      return res.status(400).json({ success: false, error: 'User is not in this team' });
     }
 
     // Remove user from team
@@ -611,11 +614,11 @@ async function handleRemoveUser(req, res, decoded, startTime, teamId) {
       duration
     });
 
-    return res.status(200).json({ message: 'User removed successfully' });
+    return res.status(200).json({ success: true, message: 'User removed successfully' });
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error removing user', { error: err.message, teamId, userId: req.body.userId, duration });
-    return res.status(500).json({ error: 'Failed to remove user' });
+    return res.status(500).json({ success: false, error: 'Failed to remove user' });
   }
 }
 
@@ -624,12 +627,12 @@ async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.read(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for get team settings', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
   if (!teamIdValidation.valid) {
-    return res.status(400).json({ error: teamIdValidation.error });
+    return res.status(400).json({ success: false, error: teamIdValidation.error });
   }
 
   try {
@@ -639,13 +642,13 @@ async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
     // Leaders can only view their own team settings
     if (decoded.role === 'leader' && team.leaderId?.toString() !== decoded.id) {
       logger.warn('Leader attempted to view another team settings', { userId: decoded.id, teamId });
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
     // Return settings or defaults
@@ -655,6 +658,7 @@ async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
     logger.response(req, res, duration, { teamId });
 
     return res.status(200).json({
+      success: true,
       settings,
       team: {
         _id: team._id,
@@ -666,7 +670,7 @@ async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error getting team settings', { error: err.message, teamId, userId: decoded.id, duration });
-    return res.status(500).json({ error: 'Failed to get team settings' });
+    return res.status(500).json({ success: false, error: 'Failed to get team settings' });
   }
 }
 
@@ -675,18 +679,18 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.mutation(req);
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for update team settings', { userId: decoded.id, teamId });
-    return res.status(429).json({ error: rateLimitResult.message });
+    return res.status(429).json({ success: false, error: rateLimitResult.message });
   }
 
   const teamIdValidation = validateObjectId(teamId);
   if (!teamIdValidation.valid) {
-    return res.status(400).json({ error: teamIdValidation.error });
+    return res.status(400).json({ success: false, error: teamIdValidation.error });
   }
 
   // Only admins and team leaders can update settings
   if (decoded.role !== 'admin' && decoded.role !== 'leader') {
     logger.warn('Non-admin/leader attempted to update team settings', { userId: decoded.id, role: decoded.role });
-    return res.status(403).json({ error: 'Only admins and team leaders can update team settings' });
+    return res.status(403).json({ success: false, error: 'Only admins and team leaders can update team settings' });
   }
 
   try {
@@ -696,13 +700,13 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
 
     const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
     if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
     // Leaders can only update their own team settings
     if (decoded.role === 'leader' && team.leaderId?.toString() !== decoded.id) {
       logger.warn('Leader attempted to update another team settings', { userId: decoded.id, teamId });
-      return res.status(403).json({ error: 'Can only update settings for your own team' });
+      return res.status(403).json({ success: false, error: 'Can only update settings for your own team' });
     }
 
     const { 
@@ -721,7 +725,7 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
       if (defaults.shiftPattern) {
         const validation = validateShiftPattern(defaults.shiftPattern);
         if (!validation.valid) {
-          return res.status(400).json({ error: `Default shift pattern: ${validation.error}` });
+          return res.status(400).json({ success: false, error: `Default shift pattern: ${validation.error}` });
         }
       }
       
@@ -732,14 +736,14 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
         for (const day of validDays) {
           if (defaults.workingDays.hasOwnProperty(day)) {
             if (typeof defaults.workingDays[day] !== 'boolean') {
-              return res.status(400).json({ error: `Default working day '${day}' must be a boolean` });
+              return res.status(400).json({ success: false, error: `Default working day '${day}' must be a boolean` });
             }
             if (defaults.workingDays[day]) hasAtLeastOneDay = true;
           }
         }
         
         if (!hasAtLeastOneDay) {
-          return res.status(400).json({ error: 'Default working days must have at least one day selected' });
+          return res.status(400).json({ success: false, error: 'Default working days must have at least one day selected' });
         }
       }
     }
@@ -748,49 +752,49 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
     if (concurrentLeave) {
       const validation = validateConcurrentLeave(concurrentLeave);
       if (!validation.valid) {
-        return res.status(400).json({ error: validation.error });
+        return res.status(400).json({ success: false, error: validation.error });
       }
     }
 
     // Validate annual leave days
     if (annualLeaveDays !== undefined) {
       if (typeof annualLeaveDays !== 'number' || annualLeaveDays < 1 || annualLeaveDays > 365) {
-        return res.status(400).json({ error: 'Annual leave days must be between 1 and 365' });
+        return res.status(400).json({ success: false, error: 'Annual leave days must be between 1 and 365' });
       }
     }
 
     // Validate max consecutive days
     if (maxConsecutiveDays !== undefined) {
       if (typeof maxConsecutiveDays !== 'number' || maxConsecutiveDays < 1 || maxConsecutiveDays > 365) {
-        return res.status(400).json({ error: 'Max consecutive days must be between 1 and 365' });
+        return res.status(400).json({ success: false, error: 'Max consecutive days must be between 1 and 365' });
       }
     }
 
     // Validate min advance notice days
     if (minAdvanceNoticeDays !== undefined) {
       if (typeof minAdvanceNoticeDays !== 'number' || minAdvanceNoticeDays < 0 || minAdvanceNoticeDays > 365) {
-        return res.status(400).json({ error: 'Min advance notice days must be between 0 and 365' });
+        return res.status(400).json({ success: false, error: 'Min advance notice days must be between 0 and 365' });
       }
     }
 
     // Validate carry over days
     if (carryOverDays !== undefined) {
       if (typeof carryOverDays !== 'number' || carryOverDays < 0 || carryOverDays > 365) {
-        return res.status(400).json({ error: 'Carry over days must be between 0 and 365' });
+        return res.status(400).json({ success: false, error: 'Carry over days must be between 0 and 365' });
       }
     }
 
     // Validate allow negative balance
     if (allowNegativeBalance !== undefined) {
       if (typeof allowNegativeBalance !== 'boolean') {
-        return res.status(400).json({ error: 'Allow negative balance must be a boolean' });
+        return res.status(400).json({ success: false, error: 'Allow negative balance must be a boolean' });
       }
     }
 
     // Validate max concurrent leave
     if (maxConcurrentLeave !== undefined) {
       if (typeof maxConcurrentLeave !== 'number' || maxConcurrentLeave < 1 || maxConcurrentLeave > 50) {
-        return res.status(400).json({ error: 'Max concurrent leave must be between 1 and 50' });
+        return res.status(400).json({ success: false, error: 'Max concurrent leave must be between 1 and 50' });
       }
     }
 
@@ -858,6 +862,6 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error('Error updating team settings', { error: err.message, teamId, userId: decoded.id, duration });
-    return res.status(500).json({ error: 'Failed to update team settings' });
+    return res.status(500).json({ success: false, error: 'Failed to update team settings' });
   }
 }

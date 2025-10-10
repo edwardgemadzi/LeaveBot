@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin } from '../lib/shared/mongodb-storage.js';
+import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin, connectToDatabase } from '../lib/shared/mongodb-storage.js';
 import { rateLimiters } from '../lib/shared/rate-limiter.js';
 import { logger } from '../lib/shared/logger.js';
 import { validateUsername, validatePassword, validateName } from '../lib/shared/validators.js';
@@ -51,10 +51,10 @@ export default async function handler(req, res) {
   const validName = nameValidation.valid ? nameValidation.value : usernameValidation.value;
   
   // Check if user already exists
-  const existingUser = await getUserByUsername(usernameValidation.value);
-  if (existingUser) {
+  const existingUserResult = await getUserByUsername(usernameValidation.value);
+  if (existingUserResult.success && existingUserResult.data) {
     logger.warn('Registration attempt with existing username', { username: usernameValidation.value });
-    return res.status(409).json({ error: 'Username already exists' });
+    return res.status(409).json({ success: false, error: 'Username already exists' });
   }
   
   // Hash password
@@ -74,7 +74,6 @@ export default async function handler(req, res) {
     
     // Apply team default settings if available
     try {
-      const { connectToDatabase } = await import('./shared/mongodb-storage.js');
       const { db } = await connectToDatabase();
       const team = await db.collection('teams').findOne({ _id: userData.teamId });
       
@@ -94,7 +93,14 @@ export default async function handler(req, res) {
     }
   }
   
-  const newUser = await addUser(userData);
+  const newUserResult = await addUser(userData);
+  
+  if (!newUserResult.success) {
+    logger.error('Failed to create user', { error: newUserResult.error });
+    return res.status(500).json({ success: false, error: 'Failed to create user account' });
+  }
+
+  const newUser = newUserResult.data;
   
   // Generate JWT token
   const token = jwt.sign(

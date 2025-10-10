@@ -7,7 +7,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public data?: any
+    public data?: unknown
   ) {
     super(message)
     this.name = 'ApiError'
@@ -17,11 +17,15 @@ export class ApiError extends Error {
 /**
  * Base API fetch with error handling
  */
-async function apiFetch(
+type SuccessResponse<T> = { success: true } & T
+type ErrorResponse = { success: false; error: string }
+export type ApiResult<T> = SuccessResponse<T> | ErrorResponse
+
+async function apiFetch<T = unknown>(
   endpoint: string,
   options: RequestInit = {},
   token?: string
-): Promise<any> {
+): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
@@ -50,7 +54,7 @@ async function apiFetch(
       )
     }
 
-    return data
+    return data as T
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -69,13 +73,13 @@ export const api = {
   // Auth endpoints
   auth: {
     login: (username: string, password: string) =>
-      apiFetch('/api/login', {
+      apiFetch<ApiResult<{ token: string; user: import('../types').User }>>('/api/login', {
         method: 'POST',
         body: JSON.stringify({ username, password }),
       }),
 
     register: (username: string, password: string, name: string, teamId?: string) =>
-      apiFetch('/api/register', {
+      apiFetch<ApiResult<{ token: string; user: import('../types').User }>>('/api/register', {
         method: 'POST',
         body: JSON.stringify({ username, password, name, teamId }),
       }),
@@ -84,31 +88,31 @@ export const api = {
   // User endpoints
   users: {
     getAll: (token: string) =>
-      apiFetch('/api/users', { method: 'GET' }, token),
+      apiFetch<ApiResult<{ users: import('../types').User[] }>>('/api/users', { method: 'GET' }, token),
 
     getById: (userId: string, token: string) =>
-      apiFetch(`/api/users?id=${userId}`, { method: 'GET' }, token),
+      apiFetch<ApiResult<{ user: import('../types').User }>>(`/api/users?id=${userId}`, { method: 'GET' }, token),
 
     getSettings: (userId: string, token: string) =>
-      apiFetch(`/api/users?id=${userId}&action=settings`, { method: 'GET' }, token),
+      apiFetch<ApiResult<{ settings: import('../types').UserSettings }>>(`/api/users?id=${userId}&action=settings`, { method: 'GET' }, token),
 
-    update: (userId: string, data: any, token: string) =>
-      apiFetch(`/api/users?id=${userId}`, {
+    update: (userId: string, data: Partial<import('../types').User>, token: string) =>
+      apiFetch<ApiResult<{ user: import('../types').User }>>(`/api/users?id=${userId}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }, token),
 
-    updateSettings: (userId: string, settings: any, token: string) =>
-      apiFetch(`/api/users?id=${userId}&action=settings`, {
+    updateSettings: (userId: string, settings: import('../types').UserSettings, token: string) =>
+      apiFetch<ApiResult<{ settings: import('../types').UserSettings }>>(`/api/users?id=${userId}&action=settings`, {
         method: 'PUT',
         body: JSON.stringify(settings),
       }, token),
 
     delete: (userId: string, token: string) =>
-      apiFetch(`/api/users?id=${userId}`, { method: 'DELETE' }, token),
+      apiFetch<ApiResult<{}>>(`/api/users?id=${userId}`, { method: 'DELETE' }, token),
 
     changePassword: (userId: string, password: string, token: string) =>
-      apiFetch(`/api/users?id=${userId}&action=password`, {
+      apiFetch<ApiResult<{}>>(`/api/users?id=${userId}&action=password`, {
         method: 'PUT',
         body: JSON.stringify({ password }),
       }, token),
@@ -117,70 +121,83 @@ export const api = {
   // Leave endpoints
   leaves: {
     getAll: (token: string) =>
-      apiFetch('/api/leaves', { method: 'GET' }, token),
+      apiFetch<ApiResult<{ leaves: import('../types').Leave[] }>>('/api/leaves', { method: 'GET' }, token),
 
-    create: (leaveData: any, token: string) =>
-      apiFetch('/api/leaves', {
+    create: (leaveData: Pick<import('../types').Leave, 'employeeName' | 'startDate' | 'endDate' | 'leaveType' | 'reason' | 'userId'>, token: string) =>
+      apiFetch<ApiResult<{ leave: import('../types').Leave }>>('/api/leaves', {
         method: 'POST',
         body: JSON.stringify(leaveData),
       }, token),
 
-    updateStatus: (leaveId: string, status: string, token: string) =>
-      apiFetch(`/api/leaves/${leaveId}`, {
+    updateStatus: (leaveId: string, status: 'approved' | 'rejected', token: string) =>
+      apiFetch<ApiResult<{}>>(`/api/leaves/${leaveId}`, {
         method: 'PUT',
         body: JSON.stringify({ status }),
       }, token),
 
     delete: (leaveId: string, token: string) =>
-      apiFetch(`/api/leaves/${leaveId}`, { method: 'DELETE' }, token),
+      apiFetch<ApiResult<{}>>(`/api/leaves/${leaveId}`, { method: 'DELETE' }, token),
+
+    // Calculate working/calendar days for a date range
+    calculate: (
+      params: { startDate: string; endDate: string; userId: string },
+      token: string
+    ) =>
+      apiFetch<ApiResult<import('../types').WorkingDaysResult>>('/api/leaves?action=calculate', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }, token),
   },
 
   // Team endpoints
   teams: {
     getAll: (token: string) =>
-      apiFetch('/api/teams', { method: 'GET' }, token),
+      apiFetch<ApiResult<{ teams: import('../types').Team[] }>>('/api/teams', { method: 'GET' }, token),
 
     getById: (teamId: string, token: string) =>
-      apiFetch(`/api/teams?id=${teamId}`, { method: 'GET' }, token),
+      apiFetch<ApiResult<{ team: import('../types').Team }>>(`/api/teams?id=${teamId}`, { method: 'GET' }, token),
 
     getSettings: (teamId: string, token: string) =>
-      apiFetch(`/api/teams?id=${teamId}&action=settings`, { method: 'GET' }, token),
+      apiFetch<ApiResult<{ settings: import('../types').TeamSettings }>>(`/api/teams?id=${teamId}&action=settings`, { method: 'GET' }, token),
 
     getMembers: async (teamId: string, token: string) => {
       // Backend returns members as part of team object
-      const data = await apiFetch(`/api/teams?id=${teamId}`, { method: 'GET' }, token)
-      return { members: data.team?.members || [], team: data.team }
+      const data = await apiFetch<ApiResult<{ team: import('../types').Team & { members?: string[] } }>>(`/api/teams?id=${teamId}`, { method: 'GET' }, token)
+      if (data.success) {
+        return { members: data.team?.members || [], team: data.team }
+      }
+      return { members: [], team: undefined as unknown as import('../types').Team }
     },
 
-    create: (teamData: any, token: string) =>
-      apiFetch('/api/teams', {
+    create: (teamData: Pick<import('../types').Team, 'name' | 'description' | 'leaderId'>, token: string) =>
+      apiFetch<ApiResult<{ team: import('../types').Team }>>('/api/teams', {
         method: 'POST',
         body: JSON.stringify(teamData),
       }, token),
 
-    update: (teamId: string, teamData: any, token: string) =>
-      apiFetch(`/api/teams?id=${teamId}`, {
+    update: (teamId: string, teamData: Partial<import('../types').Team>, token: string) =>
+      apiFetch<ApiResult<{ team: import('../types').Team }>>(`/api/teams?id=${teamId}`, {
         method: 'PUT',
         body: JSON.stringify(teamData),
       }, token),
 
-    updateSettings: (teamId: string, settings: any, token: string) =>
-      apiFetch(`/api/teams?id=${teamId}&action=settings`, {
+    updateSettings: (teamId: string, settings: import('../types').TeamSettings, token: string) =>
+      apiFetch<ApiResult<{ settings: import('../types').TeamSettings }>>(`/api/teams?id=${teamId}&action=settings`, {
         method: 'PUT',
         body: JSON.stringify(settings),
       }, token),
 
     delete: (teamId: string, token: string) =>
-      apiFetch(`/api/teams?id=${teamId}`, { method: 'DELETE' }, token),
+      apiFetch<ApiResult<{}>>(`/api/teams?id=${teamId}`, { method: 'DELETE' }, token),
 
     addMember: (teamId: string, userId: string, token: string) =>
-      apiFetch(`/api/teams?id=${teamId}&action=assign`, {
+      apiFetch<ApiResult<{}>>(`/api/teams?id=${teamId}&action=assign`, {
         method: 'POST',
         body: JSON.stringify({ userId }),
       }, token),
 
     removeMember: (teamId: string, userId: string, token: string) =>
-      apiFetch(`/api/teams?id=${teamId}&action=remove`, {
+      apiFetch<ApiResult<{}>>(`/api/teams?id=${teamId}&action=remove`, {
         method: 'POST',
         body: JSON.stringify({ userId }),
       }, token),
@@ -188,7 +205,9 @@ export const api = {
 
   // Balance endpoints
   balance: {
-    get: (userId: string, token: string) =>
-      apiFetch(`/api/balance?userId=${userId}`, { method: 'GET' }, token),
+    get: (userId: string, token: string, year?: number) => {
+      const y = year ?? new Date().getFullYear()
+      return apiFetch<ApiResult<{ balance: { totalDays: number; usedDays: number; pendingDays: number; availableDays: number } }>>(`/api/balance?userId=${userId}&year=${y}`, { method: 'GET' }, token)
+    },
   },
 }

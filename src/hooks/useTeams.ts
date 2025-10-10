@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { api, ApiError } from '../utils/api'
+import { normalizeTeam } from '../utils/normalize'
 import { Team } from '../types'
 
 export function useTeams(token: string, autoLoad = true) {
@@ -19,7 +20,7 @@ export function useTeams(token: string, autoLoad = true) {
 
     try {
       const data = await api.teams.getAll(token)
-      setTeams(data.teams || [])
+      setTeams((data.teams || []).map(normalizeTeam))
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)

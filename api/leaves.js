@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, getAllLeaves, addLeaveRequest } from '../lib/shared/mongodb-storage.js';
+import { JWT_SECRET, getAllLeaves, addLeaveRequest, connectToDatabase } from '../lib/shared/mongodb-storage.js';
 import { rateLimiters } from '../lib/shared/rate-limiter.js';
 import { logger } from '../lib/shared/logger.js';
 import { calculateWorkingDays, getDefaultTeamSettings } from '../lib/shared/working-days.js';
+import { validateObjectId, validateDate } from '../lib/shared/validators.js';
 import { ObjectId } from 'mongodb';
-import { connectToDatabase } from '../lib/shared/mongodb-storage.js';
 
 // Authentication middleware
 function authenticateToken(req) {
@@ -75,13 +75,13 @@ export default async function handler(req, res) {
   
   if (!rateLimit.allowed) {
     logger.warn('Rate limit exceeded', { endpoint: '/api/leaves', method: req.method, ip: req.headers['x-forwarded-for'] });
-    return res.status(429).json({ error: rateLimit.message });
+    return res.status(429).json({ success: false, error: rateLimit.message });
   }
   
   // Authenticate all requests
   const auth = authenticateToken(req);
   if (!auth.authenticated) {
-    return res.status(401).json({ error: auth.error });
+    return res.status(401).json({ success: false, error: auth.error });
   }
 
   // Handle calculate action (POST /api/leaves?action=calculate)
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     const { startDate, endDate, userId } = req.body;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({ error: 'startDate and endDate are required' });
+      return res.status(400).json({ success: false, error: 'startDate and endDate are required' });
     }
 
     // Validate dates
@@ -100,11 +100,11 @@ export default async function handler(req, res) {
     const end = new Date(endDate);
     
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      return res.status(400).json({ success: false, error: 'Invalid date format' });
     }
 
     if (end < start) {
-      return res.status(400).json({ error: 'End date must be after start date' });
+      return res.status(400).json({ success: false, error: 'End date must be after start date' });
     }
 
     try {
@@ -228,31 +228,36 @@ export default async function handler(req, res) {
         userId: auth.user.id,
         duration 
       });
-      return res.status(500).json({ error: 'Failed to calculate working days' });
+      return res.status(500).json({ success: false, error: 'Failed to calculate working days' });
     }
   }
 
   if (req.method === 'GET') {
     // Users can only see their own leaves (unless admin)
-    const leaves = await getAllLeaves(auth.user.id, auth.user.role);
+    const leavesResult = await getAllLeaves(auth.user.id, auth.user.role);
+    
+    if (!leavesResult.success) {
+      logger.error('Failed to fetch leaves', { error: leavesResult.error, userId: auth.user.id });
+      return res.status(500).json({ success: false, error: 'Failed to fetch leaves' });
+    }
     
     const duration = Date.now() - startTime;
-    logger.response(req, res, duration, { leaveCount: leaves.length, userId: auth.user.id });
+    logger.response(req, res, duration, { leaveCount: leavesResult.data.length, userId: auth.user.id });
     
-    return res.json({ leaves });
+    return res.json({ success: true, leaves: leavesResult.data });
   }
 
   if (req.method === 'POST') {
     // Note: Leaders can request leaves on behalf of their team members
     // Only admins are restricted from requesting leaves
     if (auth.user.role === 'admin') {
-      return res.status(403).json({ error: 'Admins cannot request leaves. This feature is only for team members and leaders.' });
+      return res.status(403).json({ success: false, error: 'Admins cannot request leaves. This feature is only for team members and leaders.' });
     }
     
     // Validate input
     const validation = validateLeaveRequest(req.body);
     if (!validation.valid) {
-      return res.status(400).json({ error: validation.error });
+      return res.status(400).json({ success: false, error: validation.error });
     }
     
     const { employeeName, startDate, endDate, reason } = validation.data;
@@ -293,6 +298,7 @@ export default async function handler(req, res) {
           });
           
           return res.status(409).json({
+            success: false,
             error: 'concurrent_limit_reached',
             message: `Cannot request leave: ${currentCount} out of ${team.settings.maxConcurrentLeave} team members are already on leave during this period. Please contact your team leader if this is urgent.`,
             currentCount,
@@ -338,23 +344,22 @@ export default async function handler(req, res) {
     // Admins and leaders can approve/reject leaves
     if (auth.user.role !== 'admin' && auth.user.role !== 'leader') {
       logger.warn('Non-admin/leader attempted to update leave status', { userId: auth.user.id, role: auth.user.role });
-      return res.status(403).json({ error: 'Only admins and team leaders can approve or reject leave requests' });
+      return res.status(403).json({ success: false, error: 'Only admins and team leaders can approve or reject leave requests' });
     }
 
     // Extract leave ID from URL path
     const leaveId = req.url.split('/').pop()?.split('?')[0];
     if (!leaveId) {
-      return res.status(400).json({ error: 'Leave ID is required' });
+      return res.status(400).json({ success: false, error: 'Leave ID is required' });
     }
 
     const { status } = req.body;
     if (!status || !['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ error: 'Valid status (approved or rejected) is required' });
+      return res.status(400).json({ success: false, error: 'Valid status (approved or rejected) is required' });
     }
 
     try {
-      const { ObjectId } = await import('mongodb');
-      const { db } = await import('./shared/mongodb-storage.js').then(m => m.connectToDatabase());
+      const { db } = await connectToDatabase();
       const leavesCollection = db.collection('leaves');
 
       const result = await leavesCollection.updateOne(
@@ -363,7 +368,7 @@ export default async function handler(req, res) {
       );
 
       if (result.matchedCount === 0) {
-        return res.status(404).json({ error: 'Leave request not found' });
+        return res.status(404).json({ success: false, error: 'Leave request not found' });
       }
 
       logger.info('Leave status updated', {
@@ -379,7 +384,7 @@ export default async function handler(req, res) {
       return res.json({ success: true, message: `Leave request ${status}` });
     } catch (err) {
       logger.error('Error updating leave status', { error: err.message, leaveId });
-      return res.status(500).json({ error: 'Failed to update leave status' });
+      return res.status(500).json({ success: false, error: 'Failed to update leave status' });
     }
   }
 
@@ -387,19 +392,18 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     const leaveId = req.query.id;
     if (!leaveId) {
-      return res.status(400).json({ error: 'Leave ID is required' });
+      return res.status(400).json({ success: false, error: 'Leave ID is required' });
     }
 
     try {
-      const { ObjectId } = await import('mongodb');
-      const { db } = await import('./shared/mongodb-storage.js').then(m => m.connectToDatabase());
+      const { db } = await connectToDatabase();
       const leavesCollection = db.collection('leaves');
 
       // Fetch the leave request first
       const leave = await leavesCollection.findOne({ _id: new ObjectId(leaveId) });
       
       if (!leave) {
-        return res.status(404).json({ error: 'Leave request not found' });
+        return res.status(404).json({ success: false, error: 'Leave request not found' });
       }
 
       // Check permissions
@@ -407,17 +411,17 @@ export default async function handler(req, res) {
       // Users can only delete their own pending leaves
       if (auth.user.role !== 'admin') {
         if (leave.userId !== auth.user.id) {
-          return res.status(403).json({ error: 'Not authorized to delete this leave request' });
+          return res.status(403).json({ success: false, error: 'Not authorized to delete this leave request' });
         }
         if (leave.status !== 'pending') {
-          return res.status(403).json({ error: 'Can only delete pending leave requests' });
+          return res.status(403).json({ success: false, error: 'Can only delete pending leave requests' });
         }
       }
 
       const result = await leavesCollection.deleteOne({ _id: new ObjectId(leaveId) });
 
       if (result.deletedCount === 0) {
-        return res.status(404).json({ error: 'Leave request not found' });
+        return res.status(404).json({ success: false, error: 'Leave request not found' });
       }
 
       logger.info('Leave request deleted', {
@@ -433,9 +437,9 @@ export default async function handler(req, res) {
       return res.json({ success: true, message: 'Leave request deleted successfully' });
     } catch (err) {
       logger.error('Error deleting leave request', { error: err.message, leaveId });
-      return res.status(500).json({ error: 'Failed to delete leave request' });
+      return res.status(500).json({ success: false, error: 'Failed to delete leave request' });
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return res.status(405).json({ success: false, error: 'Method not allowed' });
 }

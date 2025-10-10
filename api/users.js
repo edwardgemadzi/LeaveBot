@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { MongoClient, ObjectId } from 'mongodb';
+import { connectToDatabase } from '../lib/shared/mongodb-storage.js';
 import { rateLimiters } from '../lib/shared/rate-limiter.js';
 import { logger } from '../lib/shared/logger.js';
 import { validateUsername, validatePassword, validateName, validateRole, validateObjectId } from '../lib/shared/validators.js';

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Calendar, TrendingUp, Clock, CheckCircle } from 'lucide-react'
+import { api } from '../utils/api'
 
 interface BalanceData {
   totalDays: number
@@ -11,31 +12,29 @@ interface BalanceData {
 interface LeaveBalanceProps {
   userId: string
   token: string
+  refreshKey?: string | number  // Add optional refresh trigger
 }
 
-export function LeaveBalance({ userId, token }: LeaveBalanceProps) {
+export function LeaveBalance({ userId, token, refreshKey }: LeaveBalanceProps) {
   const [balance, setBalance] = useState<BalanceData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetchBalance()
-  }, [userId])
+  }, [userId, refreshKey])  // Re-fetch when refreshKey changes
 
   async function fetchBalance() {
     try {
-      const year = new Date().getFullYear()
-      const res = await fetch(`/api/balance?userId=${userId}&year=${year}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await res.json()
-      
+      setError('')
+      const data = await api.balance.get(userId, token)
       if (data.success) {
         setBalance(data.balance)
+      } else {
+        setError(data.error || 'Failed to load balance')
       }
-    } catch (error) {
-      console.error('Failed to fetch balance:', error)
+    } catch (err: any) {
+      setError(err.message || 'Network error while loading balance')
     } finally {
       setLoading(false)
     }
@@ -52,6 +51,18 @@ export function LeaveBalance({ userId, token }: LeaveBalanceProps) {
             </div>
           </div>
         ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="card border border-red-200 bg-red-50">
+          <div className="card-body">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
       </div>
     )
   }

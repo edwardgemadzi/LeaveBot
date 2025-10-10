@@ -89,7 +89,7 @@ export default function TeamMembersModal({
   const availableUsers = allUsers.filter(
     (user) =>
       user.role === 'user' &&
-      !members.some((m) => m._id === user.id || m._id === user._id)
+      !members.some((m) => (m.id || m._id) === (user.id || user._id))
   )
 
   if (!isOpen) return null
@@ -214,7 +214,7 @@ export default function TeamMembersModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {members.map((member) => (
               <div
-                key={member._id}
+                key={member.id || member._id}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -235,7 +235,7 @@ export default function TeamMembersModal({
                 </div>
                 {canManage && (
                   <button
-                    onClick={() => handleRemove(member._id)}
+                    onClick={() => handleRemove(member.id || member._id)}
                     style={{
                       padding: '6px 12px',
                       background: '#ef4444',

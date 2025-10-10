@@ -9,11 +9,7 @@ import { useUsers } from '../hooks/useUsers'
 import { useUserOperations } from '../hooks/useUserOperations'
 import { useLeaveBalances } from '../hooks/useLeaveBalances'
 import { canManageUser } from '../utils/userHelpers'
-import UserCard from './UserManagement/UserCard'
-import AddUserModal from './UserManagement/AddUserModal'
-import EditUserModal from './UserManagement/EditUserModal'
-import ChangePasswordModal from './UserManagement/ChangePasswordModal'
-import UserProfileModal from './UserProfileModal'
+import { UserManagementLayout } from './UserManagement'
 
 interface UserManagementProps {
   currentUser: User
@@ -109,148 +105,30 @@ export default function UserManagement({
   }
 
   return (
-    <div style={{ padding: '20px' }}>
-      {/* Header */}
-      <div
-        style={{
-          marginBottom: '30px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <div>
-          <h2 style={{ color: '#333', marginBottom: '10px' }}>
-            👥 Team Management
-          </h2>
-          <p style={{ color: '#6b7280', fontSize: '14px' }}>
-            {currentUser.role === 'admin'
-              ? 'You can manage all team members and leaders, and add new users'
-              : 'You can manage and add team members to your team'}
-          </p>
-        </div>
-
-        {/* Add User Button */}
-        {(currentUser.role === 'admin' || currentUser.role === 'leader') && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            style={{
-              padding: '12px 20px',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = '#059669')
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = '#10b981')
-            }
-          >
-            <span style={{ fontSize: '18px' }}>➕</span>
-            Add {currentUser.role === 'leader' ? 'Team Member' : 'User'}
-          </button>
-        )}
-      </div>
-
-      {/* Error Display */}
-      {(error || localError) && (
-        <div
-          style={{
-            padding: '12px',
-            background: '#fee2e2',
-            color: '#991b1b',
-            borderRadius: '8px',
-            marginBottom: '20px',
-            border: '1px solid #fecaca',
-          }}
-        >
-          {error || localError}
-        </div>
-      )}
-
-      {/* Users Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: '20px',
-          marginBottom: '20px',
-        }}
-      >
-        {usersWithBalances.map((user) => (
-          <UserCard
-            key={user.id || user._id}
-            user={user}
-            currentUser={currentUser}
-            canManage={canManageUser(currentUser, user)}
-            onEdit={() => setEditingUser(user)}
-            onSettings={() => setSettingsUser(user)}
-            onChangePassword={() => setChangingPasswordUser(user)}
-            onDelete={() => handleDeleteUser(user)}
-          />
-        ))}
-      </div>
-
-      {usersWithBalances.length === 0 && !loading && (
-        <p
-          style={{
-            textAlign: 'center',
-            color: '#9ca3af',
-            padding: '40px',
-          }}
-        >
-          No users found
-        </p>
-      )}
-
-      {/* Modals */}
-      <AddUserModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSubmit={handleAddUser}
-        currentUserRole={currentUser.role}
-      />
-
-      {editingUser && (
-        <EditUserModal
-          isOpen={true}
-          onClose={() => setEditingUser(null)}
-          user={editingUser}
-          onSubmit={handleUpdateUser}
-          currentUserRole={currentUser.role}
-        />
-      )}
-
-      {changingPasswordUser && (
-        <ChangePasswordModal
-          isOpen={true}
-          onClose={() => setChangingPasswordUser(null)}
-          user={changingPasswordUser}
-          onSubmit={handleChangePassword}
-        />
-      )}
-
-      {settingsUser && (
-        <UserProfileModal
-          isOpen={true}
-          onClose={() => setSettingsUser(null)}
-          user={settingsUser}
-          token={token}
-          onSuccess={() => {
-            refetch()
-            setSettingsUser(null)
-          }}
-        />
-      )}
-    </div>
+    <UserManagementLayout
+      currentUser={currentUser}
+      users={usersWithBalances}
+      error={error}
+      localError={localError}
+      showAddModal={showAddModal}
+      editingUser={editingUser}
+      changingPasswordUser={changingPasswordUser}
+      settingsUser={settingsUser}
+      token={token}
+      onAddUser={() => setShowAddModal(true)}
+      onEdit={setEditingUser}
+      onSettings={setSettingsUser}
+      onChangePassword={setChangingPasswordUser}
+      onDelete={handleDeleteUser}
+      onCloseAddModal={() => setShowAddModal(false)}
+      onCloseEditModal={() => setEditingUser(null)}
+      onClosePasswordModal={() => setChangingPasswordUser(null)}
+      onCloseSettingsModal={() => setSettingsUser(null)}
+      onAddUserSubmit={handleAddUser}
+      onUpdateUserSubmit={handleUpdateUser}
+      onChangePasswordSubmit={handleChangePassword}
+      onRefetch={refetch}
+      canManageUser={canManageUser}
+    />
   )
 }

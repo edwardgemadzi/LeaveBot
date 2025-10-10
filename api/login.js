@@ -1,51 +1,14 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET, getUserByUsername, initializeAdmin } from '../lib/shared/mongodb-storage.js';
+import { rateLimiters } from '../lib/shared/rate-limiter.js';
 import { logger } from '../lib/shared/logger.js';
 import { validateUsername, validatePassword } from '../lib/shared/validators.js';
 
 // Initialize admin on cold start
 initializeAdmin();
 
-// Rate limiting (simple in-memory implementation)
-const loginAttempts = new Map();
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
-
-function checkRateLimit(username) {
-  const now = Date.now();
-  const attempts = loginAttempts.get(username) || { count: 0, firstAttempt: now, lockedUntil: 0 };
-  
-  // Check if user is locked out
-  if (attempts.lockedUntil > now) {
-    const remainingTime = Math.ceil((attempts.lockedUntil - now) / 1000 / 60);
-    return { allowed: false, message: `Account locked. Try again in ${remainingTime} minutes.` };
-  }
-  
-  // Reset counter if first attempt was more than 15 minutes ago
-  if (now - attempts.firstAttempt > LOCKOUT_TIME) {
-    attempts.count = 0;
-    attempts.firstAttempt = now;
-  }
-  
-  return { allowed: true, attempts };
-}
-
-function recordFailedAttempt(username) {
-  const now = Date.now();
-  const attempts = loginAttempts.get(username) || { count: 0, firstAttempt: now, lockedUntil: 0 };
-  attempts.count++;
-  
-  if (attempts.count >= MAX_ATTEMPTS) {
-    attempts.lockedUntil = now + LOCKOUT_TIME;
-  }
-  
-  loginAttempts.set(username, attempts);
-}
-
-function clearAttempts(username) {
-  loginAttempts.delete(username);
-}
+// Use standardized rate limiting for authentication
 
 export default async function handler(req, res) {
   const startTime = Date.now();
@@ -77,34 +40,33 @@ export default async function handler(req, res) {
   }
   
   // Check rate limiting
-  const rateCheck = checkRateLimit(usernameValidation.value);
-  if (!rateCheck.allowed) {
+  const rateLimit = rateLimiters.auth(req, usernameValidation.value);
+  if (!rateLimit.allowed) {
     logger.warn('Rate limit exceeded for login', { username: usernameValidation.value, ip: req.headers['x-forwarded-for'] });
-    return res.status(429).json({ error: rateCheck.message });
+    return res.status(429).json({ success: false, error: rateLimit.message });
   }
   
   // Find user
-  const user = await getUserByUsername(usernameValidation.value);
+  const userResult = await getUserByUsername(usernameValidation.value);
   
-  if (!user) {
+  if (!userResult.success || !userResult.data) {
     // Prevent username enumeration - same delay as password check
     await bcrypt.compare(passwordValidation.value, '$2a$10$8K1p/a0dL3LkkPzSs/T3GOu7IqxYpU0Zy0qQZvzNqZNMkWXLrQGRW');
-    recordFailedAttempt(usernameValidation.value);
     logger.warn('Failed login attempt - user not found', { username: usernameValidation.value, ip: req.headers['x-forwarded-for'] });
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return res.status(401).json({ success: false, error: 'Invalid credentials' });
   }
+
+  const user = userResult.data;
   
   // Verify password with bcrypt
   const isValidPassword = await bcrypt.compare(passwordValidation.value, user.passwordHash);
   
   if (!isValidPassword) {
-    recordFailedAttempt(usernameValidation.value);
     logger.warn('Failed login attempt - invalid password', { username: usernameValidation.value, ip: req.headers['x-forwarded-for'] });
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   
-  // Clear failed attempts on successful login
-  clearAttempts(usernameValidation.value);
+  // Successful login
   
   // Generate JWT token
   const token = jwt.sign(

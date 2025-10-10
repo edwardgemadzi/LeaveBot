@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { api, ApiError } from '../utils/api'
+import { normalizeUser } from '../utils/normalize'
 import { User } from '../types'
 
 export function useUsers(token: string, autoLoad = true) {
@@ -20,7 +21,7 @@ export function useUsers(token: string, autoLoad = true) {
     try {
       const data = await api.users.getAll(token)
       if (data.success) {
-        setUsers(data.users)
+        setUsers((data.users as User[]).map(normalizeUser))
       } else {
         setError(data.error || 'Failed to load users')
       }

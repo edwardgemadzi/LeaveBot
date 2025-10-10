@@ -2,8 +2,8 @@
  * Leave Request Form Component
  */
 
-import { useState, useEffect } from 'react'
-import { User } from '../../types'
+import React, { useState, useEffect } from 'react'
+import { User, WorkingDaysResult } from '../../types'
 import { api } from '../../utils/api'
 
 interface LeaveRequestFormProps {
@@ -14,6 +14,8 @@ interface LeaveRequestFormProps {
   onCancel: () => void
   showToast: (message: string) => void
   showError: (message: string) => void
+  initialStartDate?: Date
+  initialEndDate?: Date
 }
 
 export default function LeaveRequestForm({
@@ -24,14 +26,16 @@ export default function LeaveRequestForm({
   onCancel,
   showToast,
   showError,
+  initialStartDate,
+  initialEndDate,
 }: LeaveRequestFormProps) {
   const [employeeName, setEmployeeName] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(() => initialStartDate ? initialStartDate.toISOString().slice(0, 10) : '')
+  const [endDate, setEndDate] = useState(() => initialEndDate ? initialEndDate.toISOString().slice(0, 10) : '')
   const [leaveType, setLeaveType] = useState('')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
-  const [calculatedDays, setCalculatedDays] = useState<any>(null)
+  const [calculatedDays, setCalculatedDays] = useState<WorkingDaysResult | null>(null)
   const [calculating, setCalculating] = useState(false)
 
   // Calculate days when dates change
@@ -52,23 +56,12 @@ export default function LeaveRequestForm({
   const calculateDays = async () => {
     setCalculating(true)
     try {
-      const res = await fetch('/api/leaves?action=calculate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          startDate,
-          endDate,
-          userId: user.id,
-        }),
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setCalculatedDays(data)
-      }
+      const data = await api.leaves.calculate({
+        startDate,
+        endDate,
+        userId: user.id,
+      }, token)
+      setCalculatedDays(data as WorkingDaysResult)
     } catch (err) {
       console.error('Failed to calculate days:', err)
     } finally {
@@ -115,65 +108,17 @@ export default function LeaveRequestForm({
   const isAdmin = user.role === 'admin' || user.role === 'leader'
 
   return (
-    <div
-      style={{
-        background: 'white',
-        borderRadius: '12px',
-        padding: '30px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '20px',
-        }}
-      >
-        <h2 style={{ margin: 0, color: '#1f2937' }}>
-          📝 Request Leave
-        </h2>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: '8px 16px',
-            background: '#e5e7eb',
-            color: '#374151',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: '500',
-          }}
-        >
-          Cancel
-        </button>
+    <div className="bg-white rounded-xl p-7 shadow-sm">
+      <div className="flex justify-between items-center mb-5">
+        <h2 className="m-0 text-gray-800">📝 Request Leave</h2>
+        <button onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-md font-medium">Cancel</button>
       </div>
 
       <form onSubmit={handleSubmit}>
         {isAdmin && teamMembers.length > 0 && (
-          <div style={{ marginBottom: '20px' }}>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: '#374151',
-                fontWeight: '500',
-              }}
-            >
-              Employee
-            </label>
-            <select
-              value={employeeName}
-              onChange={(e) => setEmployeeName(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px',
-              }}
-            >
+          <div className="mb-5">
+            <label className="block mb-2 text-slate-700 font-medium">Employee</label>
+            <select value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-md text-sm">
               <option value="">Select employee (optional - defaults to you)</option>
               {teamMembers.map((member) => (
                 <option key={member.id || member._id} value={member.name}>
@@ -184,81 +129,19 @@ export default function LeaveRequestForm({
           </div>
         )}
 
-        <div style={{ marginBottom: '20px' }}>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: '#374151',
-              fontWeight: '500',
-            }}
-          >
-            Start Date *
-          </label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            required
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px',
-            }}
-          />
+        <div className="mb-5">
+          <label className="block mb-2 text-slate-700 font-medium">Start Date *</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="w-full p-2.5 border border-slate-300 rounded-md text-sm" />
         </div>
 
-        <div style={{ marginBottom: '20px' }}>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: '#374151',
-              fontWeight: '500',
-            }}
-          >
-            End Date *
-          </label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            required
-            min={startDate}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px',
-            }}
-          />
+        <div className="mb-5">
+          <label className="block mb-2 text-slate-700 font-medium">End Date *</label>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required min={startDate} className="w-full p-2.5 border border-slate-300 rounded-md text-sm" />
         </div>
 
-        <div style={{ marginBottom: '20px' }}>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: '#374151',
-              fontWeight: '500',
-            }}
-          >
-            Leave Type
-          </label>
-          <select
-            value={leaveType}
-            onChange={(e) => setLeaveType(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px',
-            }}
-          >
+        <div className="mb-5">
+          <label className="block mb-2 text-slate-700 font-medium">Leave Type</label>
+          <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-md text-sm">
             <option value="">Select type (optional)</option>
             <option value="vacation">🏖️ Vacation</option>
             <option value="sick">🤒 Sick Leave</option>
@@ -269,97 +152,28 @@ export default function LeaveRequestForm({
           </select>
         </div>
 
-        <div style={{ marginBottom: '20px' }}>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: '#374151',
-              fontWeight: '500',
-            }}
-          >
-            Reason
-          </label>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Optional: Provide a reason for your leave"
-            rows={3}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px',
-              resize: 'vertical',
-            }}
-          />
+        <div className="mb-5">
+          <label className="block mb-2 text-slate-700 font-medium">Reason</label>
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional: Provide a reason for your leave" rows={3} className="w-full p-2.5 border border-slate-300 rounded-md text-sm resize-y" />
         </div>
 
         {/* Calculated Days Display */}
         {calculatedDays && (
-          <div
-            style={{
-              padding: '15px',
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '8px',
-              marginBottom: '20px',
-            }}
-          >
-            <h4
-              style={{
-                margin: '0 0 10px 0',
-                fontSize: '14px',
-                color: '#065f46',
-              }}
-            >
-              📊 Leave Summary
-            </h4>
-            <p style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#374151' }}>
-              <strong>Working Days:</strong> {calculatedDays.workingDays || 0}
-            </p>
-            <p style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#374151' }}>
-              <strong>Calendar Days:</strong> {calculatedDays.calendarDays || 0}
-            </p>
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg mb-5">
+            <h4 className="m-0 mb-2 text-sm text-emerald-900">📊 Leave Summary</h4>
+            <p className="m-0 mb-1 text-sm text-slate-700"><strong>Working Days:</strong> {calculatedDays.count || 0}</p>
+            <p className="m-0 mb-1 text-sm text-slate-700"><strong>Calendar Days:</strong> {calculatedDays.calendarDays || 0}</p>
             {calculatedDays.warning && (
-              <p
-                style={{
-                  margin: '10px 0 0 0',
-                  fontSize: '13px',
-                  color: '#dc2626',
-                  fontWeight: '500',
-                }}
-              >
-                ⚠️ {calculatedDays.warning}
-              </p>
+              <p className="mt-2 text-[13px] text-red-600 font-medium">⚠️ {calculatedDays.warning}</p>
             )}
           </div>
         )}
 
         {calculating && (
-          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px' }}>
-            Calculating days...
-          </p>
+          <p className="text-sm text-slate-500 mb-5">Calculating days...</p>
         )}
 
-        <button
-          type="submit"
-          disabled={loading || !startDate || !endDate}
-          style={{
-            width: '100%',
-            padding: '12px',
-            background:
-              loading || !startDate || !endDate ? '#9ca3af' : '#10b981',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor:
-              loading || !startDate || !endDate ? 'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: '600',
-          }}
-        >
+        <button type="submit" disabled={loading || !startDate || !endDate} className={`w-full px-4 py-3 rounded-lg text-white text-base font-semibold ${loading || !startDate || !endDate ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-500'}`}>
           {loading ? 'Submitting...' : 'Submit Leave Request'}
         </button>
       </form>

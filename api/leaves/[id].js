@@ -1,9 +1,8 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../../lib/shared/mongodb-storage.js';
-import { connectToDatabase } from '../../lib/shared/mongodb-storage.js';
 import { ObjectId } from 'mongodb';
-import { logger } from '../../lib/shared/logger.js';
+import { JWT_SECRET, connectToDatabase } from '../../lib/shared/mongodb-storage.js';
 import { rateLimiters } from '../../lib/shared/rate-limiter.js';
+import { logger } from '../../lib/shared/logger.js';
 
 // Authentication middleware
 function authenticateToken(req) {

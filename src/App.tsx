@@ -3,26 +3,17 @@
  * Orchestrates authentication, routing, and main views
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import './App.css'
 import { useAuth } from './hooks/useAuth'
 import { useLeaves } from './hooks/useLeaves'
 import { useUsers } from './hooks/useUsers'
 import { useToast } from './hooks/useToast'
 import Authentication from './components/Auth/Authentication'
-import Dashboard from './components/Dashboard'
-import InteractiveCalendar from './components/InteractiveCalendar'
-import UserManagementRefactored from './components/UserManagementRefactored'
-import TeamManagementRefactored from './components/TeamManagementRefactored'
-import TeamLeaveSettings from './components/TeamLeaveSettings'
-import UserProfileModal from './components/UserProfileModal'
-import LeaveRequestForm from './components/Leaves/LeaveRequestForm'
-import LeaveCard from './components/Leaves/LeaveCard'
-import NavTab from './components/Navigation/NavTab'
-import { ToastContainer } from './components/Toast'
-import { EmptyState } from './components/EmptyState'
-import { LeaveCardSkeleton } from './components/LoadingSkeleton'
-import { SearchFilter } from './components/SearchFilter'
+import { AppLayout } from './components/App'
+import { useUserSettings } from './hooks/useUserSettings'
+import { useTeamMembers } from './hooks/useTeamMembers'
+import { useAutoRefresh } from './hooks/useAutoRefresh'
 
 type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams' | 'team-settings'
 
@@ -36,42 +27,15 @@ function App() {
   const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
   const [showProfileSettings, setShowProfileSettings] = useState(false)
   const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const { settings: userSettings } = useUserSettings(user?.id, token)
+  const [requestDates, setRequestDates] = useState<{ startDate: Date; endDate: Date } | null>(null)
 
   // Auto-refresh leaves every 30 seconds
-  useEffect(() => {
-    if (!isAuthenticated) return
-
-    const interval = setInterval(() => {
-      refetchLeaves()
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [isAuthenticated, refetchLeaves])
+  useAutoRefresh(refetchLeaves, isAuthenticated, 30000)
 
   // Load team members for admins/leaders
-  useEffect(() => {
-    if (user && (user.role === 'admin' || user.role === 'leader')) {
-      loadTeamMembers()
-    }
-  }, [user, token])
-
-  const loadTeamMembers = async () => {
-    if (!token) return
-
-    try {
-      const res = await fetch('/api/users', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        const members = data.users.filter((u: any) => u.role === 'user')
-        setTeamMembers(members)
-      }
-    } catch (err) {
-      console.error('Failed to load team members:', err)
-    }
-  }
+  const { members } = useTeamMembers(token, !!user && (user.role === 'admin' || user.role === 'leader'))
+  useEffect(() => { setTeamMembers(members as any[]) }, [members])
 
   // Filter leaves based on search and status
   const filteredLeaves = useMemo(() => {
@@ -120,260 +84,40 @@ function App() {
   const isAdmin = user!.role === 'admin' || user!.role === 'leader'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f3f4f6' }}>
-      <ToastContainer toasts={toasts} onClose={closeToast} />
-
-      {/* Header */}
-      <div
-        style={{
-          background: 'white',
-          borderBottom: '1px solid #e5e7eb',
-          padding: '20px 30px',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <h1 style={{ margin: '0 0 5px 0', fontSize: '28px', color: '#1f2937' }}>
-              🌴 LeaveBot
-            </h1>
-            <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-              Welcome back, {user!.name}!
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={() => setShowProfileSettings(true)}
-              style={{
-                padding: '10px 16px',
-                background: '#f3f4f6',
-                color: '#374151',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-              }}
-            >
-              ⚙️ Settings
-            </button>
-            <button
-              onClick={logout}
-              style={{
-                padding: '10px 16px',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-              }}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <div
-        style={{
-          background: 'white',
-          borderBottom: '1px solid #e5e7eb',
-          padding: '15px 30px',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            display: 'flex',
-            gap: '10px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <NavTab
-            active={currentView === 'dashboard'}
-            onClick={() => setCurrentView('dashboard')}
-            icon="📊"
-            label="Dashboard"
-          />
-          <NavTab
-            active={currentView === 'calendar'}
-            onClick={() => setCurrentView('calendar')}
-            icon="📅"
-            label="Calendar"
-          />
-          <NavTab
-            active={currentView === 'list'}
-            onClick={() => setCurrentView('list')}
-            icon="📋"
-            label="All Requests"
-          />
-          <NavTab
-            active={currentView === 'form'}
-            onClick={() => setCurrentView('form')}
-            icon="➕"
-            label="New Request"
-          />
-          {isAdmin && (
-            <>
-              <NavTab
-                active={currentView === 'team'}
-                onClick={() => setCurrentView('team')}
-                icon="👥"
-                label="Team Members"
-              />
-              <NavTab
-                active={currentView === 'teams'}
-                onClick={() => setCurrentView('teams')}
-                icon="🏢"
-                label="Teams"
-              />
-              <NavTab
-                active={currentView === 'team-settings'}
-                onClick={() => setCurrentView('team-settings')}
-                icon="⚙️"
-                label="Team Settings"
-              />
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '30px' }}>
-        {currentView === 'dashboard' && (
-          <Dashboard
-            leaves={leaves}
-            user={user!}
-            token={token}
-            onLeaveUpdate={refetchLeaves}
-          />
-        )}
-
-        {currentView === 'calendar' && (
-          <InteractiveCalendar
-            leaves={leaves}
-            user={user!}
-            token={token}
-          />
-        )}
-
-        {currentView === 'list' && (
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px',
-              }}
-            >
-              <h2 style={{ margin: 0, color: '#1f2937' }}>📋 All Leave Requests</h2>
-            </div>
-
-            <SearchFilter
-              onFilterChange={setSearchFilter}
-              resultCount={filteredLeaves.length}
-            />
-
-            {leavesLoading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-                {[...Array(6)].map((_, i) => (
-                  <LeaveCardSkeleton key={i} />
-                ))}
-              </div>
-            ) : filteredLeaves.length === 0 ? (
-              <EmptyState
-                icon="leaves"
-                title="No leave requests found"
-                description={
-                  searchFilter.search || searchFilter.status
-                    ? 'Try adjusting your search filters'
-                    : 'Submit your first leave request to get started'
-                }
-                action={
-                  !searchFilter.search && !searchFilter.status
-                    ? { label: 'Request Leave', onClick: () => setCurrentView('form') }
-                    : undefined
-                }
-              />
-            ) : (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                  gap: '20px',
-                }}
-              >
-                {filteredLeaves.map((leave) => (
-                  <LeaveCard
-                    key={leave._id}
-                    leave={leave}
-                    isAdmin={isAdmin}
-                    onStatusUpdate={handleStatusUpdate}
-                    token={token}
-                    showToast={success}
-                    showError={showError}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {currentView === 'form' && (
-          <LeaveRequestForm
-            user={user!}
-            token={token}
-            teamMembers={teamMembers}
-            onSuccess={() => {
-              refetchLeaves()
-              setCurrentView('list')
-            }}
-            onCancel={() => setCurrentView('dashboard')}
-            showToast={success}
-            showError={showError}
-          />
-        )}
-
-        {currentView === 'team' && isAdmin && (
-          <UserManagementRefactored currentUser={user!} token={token} />
-        )}
-
-        {currentView === 'teams' && isAdmin && (
-          <TeamManagementRefactored currentUser={user!} token={token} />
-        )}
-
-        {currentView === 'team-settings' && isAdmin && (
-          <TeamLeaveSettings user={user!} token={token} />
-        )}
-      </div>
-
-      {/* Profile Settings Modal */}
-      {showProfileSettings && (
-        <UserProfileModal
-          isOpen={true}
-          onClose={() => setShowProfileSettings(false)}
-          user={user!}
-          token={token}
-          onSuccess={() => {
-            success('Settings updated successfully!')
-            setShowProfileSettings(false)
-          }}
-        />
-      )}
-    </div>
+    <AppLayout
+      user={user!}
+      currentView={currentView}
+      leaves={leaves}
+      filteredLeaves={filteredLeaves}
+      leavesLoading={leavesLoading}
+      isAdmin={isAdmin}
+      teamMembers={teamMembers}
+      requestDates={requestDates}
+      userSettings={userSettings}
+      searchFilter={searchFilter}
+      showProfileSettings={showProfileSettings}
+      toasts={toasts}
+      onViewChange={setCurrentView}
+      onSettingsClick={() => setShowProfileSettings(true)}
+      onLogout={logout}
+      onLeaveUpdate={refetchLeaves}
+      onRequestLeave={(startDate, endDate) => {
+        setRequestDates({ startDate, endDate })
+        setCurrentView('form')
+      }}
+      onStatusUpdate={handleStatusUpdate}
+      onFilterChange={setSearchFilter}
+      onFormSuccess={() => {
+        refetchLeaves()
+        setCurrentView('list')
+      }}
+      onFormCancel={() => setCurrentView('dashboard')}
+      onCloseProfileSettings={() => setShowProfileSettings(false)}
+      onCloseToast={closeToast}
+      showToast={success}
+      showError={showError}
+      token={token}
+    />
   )
 }
 

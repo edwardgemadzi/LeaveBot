@@ -25,13 +25,13 @@ export default async function handler(req, res) {
   
   if (!rateLimit.allowed) {
     logger.warn('Rate limit exceeded', { endpoint: '/api/balance', ip: req.headers['x-forwarded-for'] });
-    return res.status(429).json({ error: rateLimit.message });
+    return res.status(429).json({ success: false, error: rateLimit.message });
   }
 
   // Verify authentication
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
   const token = authHeader.split(' ')[1];
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     decoded = jwt.verify(token, JWT_SECRET);
   } catch (err) {
     logger.warn('Invalid JWT token', { error: err.message });
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
   const { db } = await connectToDatabase();
@@ -50,18 +50,18 @@ export default async function handler(req, res) {
     const { userId, year } = req.query;
     
     if (!userId || !year) {
-      return res.status(400).json({ error: 'userId and year are required' });
+      return res.status(400).json({ success: false, error: 'userId and year are required' });
     }
 
     // Validate userId format
     const userIdValidation = validateObjectId(userId);
     if (!userIdValidation.valid) {
-      return res.status(400).json({ error: userIdValidation.error });
+      return res.status(400).json({ success: false, error: userIdValidation.error });
     }
 
     const yearNum = parseInt(year);
     if (isNaN(yearNum) || yearNum < 2020 || yearNum > 2100) {
-      return res.status(400).json({ error: 'Invalid year' });
+      return res.status(400).json({ success: false, error: 'Invalid year' });
     }
 
     try {
@@ -122,7 +122,7 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       logger.error('Failed to fetch balance', { error: error.message, userId, year });
-      return res.status(500).json({ error: 'Failed to fetch balance' });
+      return res.status(500).json({ success: false, error: 'Failed to fetch balance' });
     }
   }
 
@@ -132,37 +132,37 @@ export default async function handler(req, res) {
 
     // Only admins can modify balances directly
     if (decoded.role !== 'admin') {
-      return res.status(403).json({ error: 'Only admins can modify balances' });
+      return res.status(403).json({ success: false, error: 'Only admins can modify balances' });
     }
 
     if (!userId || !year) {
-      return res.status(400).json({ error: 'userId and year are required' });
+      return res.status(400).json({ success: false, error: 'userId and year are required' });
     }
 
     // Validate inputs
     const userIdValidation = validateObjectId(userId);
     if (!userIdValidation.valid) {
-      return res.status(400).json({ error: userIdValidation.error });
+      return res.status(400).json({ success: false, error: userIdValidation.error });
     }
 
     const totalValidation = validateBalance(totalDays || 20);
     if (!totalValidation.valid) {
-      return res.status(400).json({ error: `Total days: ${totalValidation.error}` });
+      return res.status(400).json({ success: false, error: `Total days: ${totalValidation.error}` });
     }
 
     const usedValidation = validateBalance(usedDays || 0);
     if (!usedValidation.valid) {
-      return res.status(400).json({ error: `Used days: ${usedValidation.error}` });
+      return res.status(400).json({ success: false, error: `Used days: ${usedValidation.error}` });
     }
 
     const pendingValidation = validateBalance(pendingDays || 0);
     if (!pendingValidation.valid) {
-      return res.status(400).json({ error: `Pending days: ${pendingValidation.error}` });
+      return res.status(400).json({ success: false, error: `Pending days: ${pendingValidation.error}` });
     }
 
     const yearNum = parseInt(year);
     if (isNaN(yearNum) || yearNum < 2020 || yearNum > 2100) {
-      return res.status(400).json({ error: 'Invalid year' });
+      return res.status(400).json({ success: false, error: 'Invalid year' });
     }
 
     try {
@@ -198,9 +198,9 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       logger.error('Failed to update balance', { error: error.message, userId, year });
-      return res.status(500).json({ error: 'Failed to update balance' });
+      return res.status(500).json({ success: false, error: 'Failed to update balance' });
     }
   }
 
-  res.status(405).json({ error: 'Method not allowed' })
+  res.status(405).json({ success: false, error: 'Method not allowed' })
 }
