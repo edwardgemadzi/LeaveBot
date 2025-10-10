@@ -624,11 +624,16 @@ async function handleUpdateUserSettings(req, res, decoded, startTime, id) {
 
   // Check authorization
   // - User can update their own settings
-  // - Admins can update any user's settings
-  // - Leaders can update their team members' settings
+  // - Team leaders can update their own settings
+  // - Leaders can update their team members' settings (but not admins or other leaders)
+  // - Admins cannot update user settings (they don't make leave requests)
   if (decoded.id !== user._id.toString()) {
     if (decoded.role === 'admin') {
-      // Admin can update any user
+      // Admins cannot update user settings - they don't make leave requests
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Admins cannot update user settings' 
+      });
     } else if (decoded.role === 'leader') {
       // Leader can only update team members (not admins or other leaders)
       if (user.role === 'admin' || user.role === 'leader') {

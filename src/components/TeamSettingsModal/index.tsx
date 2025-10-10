@@ -23,16 +23,6 @@ interface TeamSettingsModalProps {
       }
       annualLeaveDays: number
       defaults?: {
-        shiftPattern: {
-          type: string
-          customPattern?: string
-          referenceDate?: string
-        }
-        shiftTime: {
-          type: string
-          customStart?: string
-          customEnd?: string
-        }
         workingDays: {
           monday: boolean
           tuesday: boolean
@@ -58,16 +48,6 @@ const defaultSettings = {
   },
   annualLeaveDays: 21,
   defaults: {
-    shiftPattern: {
-      type: 'regular',
-      customPattern: '',
-      referenceDate: new Date().toISOString().split('T')[0]
-    },
-    shiftTime: {
-      type: 'day',
-      customStart: '08:00',
-      customEnd: '17:00'
-    },
     workingDays: {
       monday: true,
       tuesday: true,

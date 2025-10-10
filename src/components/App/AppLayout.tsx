@@ -85,6 +85,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
       <AppHeader
         userName={user.name}
+        userRole={user.role}
         onSettingsClick={onSettingsClick}
         onLogout={onLogout}
       />

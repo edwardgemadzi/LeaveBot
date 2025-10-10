@@ -2,12 +2,14 @@ import React from 'react';
 
 interface AppHeaderProps {
   userName: string;
+  userRole: string;
   onSettingsClick: () => void;
   onLogout: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   userName,
+  userRole,
   onSettingsClick,
   onLogout
 }) => {
@@ -20,12 +22,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
 
         <div className="flex gap-2.5 items-center">
-          <button
-            onClick={onSettingsClick}
-            className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium"
-          >
-            ⚙️ Settings
-          </button>
+          {/* Only show Settings button for users and team leaders (not admins) */}
+          {userRole !== 'admin' && (
+            <button
+              onClick={onSettingsClick}
+              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium"
+            >
+              ⚙️ Settings
+            </button>
+          )}
           <button
             onClick={onLogout}
             className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold"
