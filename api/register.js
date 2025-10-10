@@ -4,6 +4,7 @@ import { JWT_SECRET, addUser, getUserByUsername, initializeAdmin, connectToDatab
 import { rateLimiters } from '../lib/shared/rate-limiter.js';
 import { logger } from '../lib/shared/logger.js';
 import { validateUsername, validatePassword, validateName } from '../lib/shared/validators.js';
+import { getDefaultTeamSettings } from '../lib/shared/working-days.js';
 
 // Initialize admin on cold start
 initializeAdmin();
@@ -90,30 +91,44 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Team name is required for team leaders' });
     }
 
-    // Check if team name already exists
-    const existingTeam = await teamsCollection.findOne({ name: teamName.trim() });
-    if (existingTeam) {
-      return res.status(400).json({ error: 'Team name already exists' });
+    try {
+      // Connect to database and get teams collection
+      const client = await connectToDatabase();
+      const db = client.db('leavebot');
+      const teamsCollection = db.collection('teams');
+
+      // Check if team name already exists
+      const existingTeam = await teamsCollection.findOne({ name: teamName.trim() });
+      if (existingTeam) {
+        return res.status(400).json({ error: 'Team name already exists' });
+      }
+
+      // Create new team for the leader
+      const newTeam = {
+        name: teamName.trim(),
+        description: `Team managed by ${validName}`,
+        leaderId: null, // Will be set after user creation
+        members: [],
+        settings: getDefaultTeamSettings(),
+        createdAt: new Date()
+      };
+
+      const teamResult = await teamsCollection.insertOne(newTeam);
+      resolvedTeamId = teamResult.insertedId;
+
+      logger.info('Team created for new leader during registration', {
+        teamId: resolvedTeamId.toString(),
+        teamName: teamName.trim(),
+        leaderName: validName
+      });
+    } catch (teamError) {
+      logger.error('Error creating team for leader', {
+        error: teamError.message,
+        teamName: teamName.trim(),
+        leaderName: validName
+      });
+      return res.status(500).json({ error: 'Failed to create team' });
     }
-
-    // Create new team for the leader
-    const newTeam = {
-      name: teamName.trim(),
-      description: `Team managed by ${validName}`,
-      leaderId: null, // Will be set after user creation
-      members: [],
-      settings: getDefaultTeamSettings(),
-      createdAt: new Date()
-    };
-
-    const teamResult = await teamsCollection.insertOne(newTeam);
-    resolvedTeamId = teamResult.insertedId;
-
-    logger.info('Team created for new leader during registration', {
-      teamId: resolvedTeamId.toString(),
-      teamName: teamName.trim(),
-      leaderName: validName
-    });
   }
   
   // Check if user already exists
@@ -173,6 +188,10 @@ export default async function handler(req, res) {
   if (role === 'leader' && resolvedTeamId) {
     try {
       const { ObjectId } = await import('mongodb');
+      const client = await connectToDatabase();
+      const db = client.db('leavebot');
+      const teamsCollection = db.collection('teams');
+      
       await teamsCollection.updateOne(
         { _id: new ObjectId(resolvedTeamId) },
         { 

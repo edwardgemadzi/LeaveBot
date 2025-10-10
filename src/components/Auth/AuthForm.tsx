@@ -109,7 +109,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({
         />
       )}
 
-      {isRegistering && (
+      {isRegistering && formData.role === 'user' && (
         <AuthFormField
           label="Team Registration Token"
           type="text"
