@@ -90,6 +90,9 @@ export default async (req, res) => {
 // GET /api/teams - List all teams
 async function handleListTeams(req, res, decoded, startTime) {
   const rateLimitResult = rateLimiters.read(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for list teams', { userId: decoded.id });
     return res.status(429).json({ success: false, error: rateLimitResult.message });
@@ -636,6 +639,9 @@ async function handleRemoveUser(req, res, decoded, startTime, teamId) {
 // GET /api/teams?id={teamId}&action=settings - Get team settings
 async function handleGetTeamSettings(req, res, decoded, startTime, teamId) {
   const rateLimitResult = rateLimiters.read(req);
+  Object.entries(rateLimitResult.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded for get team settings', { userId: decoded.id, teamId });
     return res.status(429).json({ success: false, error: rateLimitResult.message });

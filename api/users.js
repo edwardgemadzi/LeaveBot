@@ -537,12 +537,25 @@ async function handleGetUserSettings(req, res, decoded, startTime, id) {
     return res.status(404).json({ success: false, error: 'User not found' });
   }
 
-  // Check authorization: user can get their own settings, or admins can get any
+  // Check authorization: user can get their own settings, admins can get any, or leaders can get their team members' settings
   if (decoded.role !== 'admin' && decoded.id !== user._id.toString()) {
-    return res.status(403).json({ 
-      success: false, 
-      error: 'Unauthorized: You can only view your own settings' 
-    });
+    if (decoded.role === 'leader') {
+      // Check if the user is in the leader's team
+      const teamsCollection = db.collection('teams');
+      const leaderTeam = await teamsCollection.findOne({ leaderId: new ObjectId(decoded.id) });
+      
+      if (!leaderTeam || user.teamId?.toString() !== leaderTeam._id.toString()) {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Unauthorized: You can only view settings for your team members' 
+        });
+      }
+    } else {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Unauthorized: You can only view your own settings' 
+      });
+    }
   }
 
   // Get user settings or fallback to team defaults
