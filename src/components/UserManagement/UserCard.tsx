@@ -189,21 +189,24 @@ export default function UserCard({
           >
             ✏️ Edit
           </button>
-          <button
-            onClick={onSettings}
-            style={{
-              padding: '8px 12px',
-              background: '#8b5cf6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '500',
-            }}
-          >
-            ⚙️ Settings
-          </button>
+          {/* Settings button only for regular users, not for leaders */}
+          {user.role === 'user' && (
+            <button
+              onClick={onSettings}
+              style={{
+                padding: '8px 12px',
+                background: '#8b5cf6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '500',
+              }}
+            >
+              ⚙️ Settings
+            </button>
+          )}
           <button
             onClick={onChangePassword}
             style={{
