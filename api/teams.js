@@ -136,21 +136,39 @@ async function handleListTeams(req, res, decoded, startTime) {
     
     const teamsWithDetails = await Promise.all(
       teams.map(async (team) => {
-        const leader = team.leaderId
-          ? await usersCollection.findOne({ _id: team.leaderId })
-          : null;
+        try {
+          const leader = team.leaderId
+            ? await usersCollection.findOne({ _id: team.leaderId })
+            : null;
 
-        const memberCount = await usersCollection.countDocuments({ teamId: team._id });
+          const memberCount = await usersCollection.countDocuments({ teamId: team._id });
 
-        return {
-          _id: team._id,
-          name: team.name,
-          description: team.description,
-          leaderId: team.leaderId,
-          leaderName: leader ? leader.name : 'Unassigned',
-          memberCount,
-          createdAt: team.createdAt
-        };
+          return {
+            _id: team._id,
+            name: team.name,
+            description: team.description,
+            leaderId: team.leaderId,
+            leaderName: leader ? leader.name : 'Unassigned',
+            memberCount,
+            createdAt: team.createdAt
+          };
+        } catch (teamError) {
+          logger.error('Error processing team details', { 
+            teamId: team._id, 
+            teamName: team.name, 
+            error: teamError.message 
+          });
+          // Return a basic team object if processing fails
+          return {
+            _id: team._id,
+            name: team.name,
+            description: team.description || '',
+            leaderId: team.leaderId,
+            leaderName: 'Error loading',
+            memberCount: 0,
+            createdAt: team.createdAt
+          };
+        }
       })
     );
 
@@ -160,7 +178,13 @@ async function handleListTeams(req, res, decoded, startTime) {
     return res.status(200).json({ success: true, teams: teamsWithDetails });
   } catch (err) {
     const duration = Date.now() - startTime;
-    logger.error('Error listing teams', { error: err.message, userId: decoded.id, duration });
+    logger.error('Error listing teams', { 
+      error: err.message, 
+      stack: err.stack,
+      userId: decoded.id, 
+      role: decoded.role,
+      duration 
+    });
     return res.status(500).json({ success: false, error: 'Failed to list teams' });
   }
 }
