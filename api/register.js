@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: rateLimit.message });
   }
 
-  const { username, password, name, teamId, teamToken } = req.body;
+  const { username, password, name, role = 'user', teamId, teamToken, teamName } = req.body;
   
   // Validate inputs using validators
   const usernameValidation = validateUsername(username);
@@ -45,6 +45,11 @@ export default async function handler(req, res) {
   const passwordValidation = validatePassword(password);
   if (!passwordValidation.valid) {
     return res.status(400).json({ error: passwordValidation.error });
+  }
+
+  // Validate role
+  if (!['user', 'leader'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role. Must be "user" or "leader"' });
   }
 
   const nameValidation = validateName(name, false);
@@ -77,6 +82,39 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid or expired team token' });
     }
   }
+
+  // Handle team creation for leaders
+  let resolvedTeamId = teamId;
+  if (role === 'leader') {
+    if (!teamName || teamName.trim().length === 0) {
+      return res.status(400).json({ error: 'Team name is required for team leaders' });
+    }
+
+    // Check if team name already exists
+    const existingTeam = await teamsCollection.findOne({ name: teamName.trim() });
+    if (existingTeam) {
+      return res.status(400).json({ error: 'Team name already exists' });
+    }
+
+    // Create new team for the leader
+    const newTeam = {
+      name: teamName.trim(),
+      description: `Team managed by ${validName}`,
+      leaderId: null, // Will be set after user creation
+      members: [],
+      settings: getDefaultTeamSettings(),
+      createdAt: new Date()
+    };
+
+    const teamResult = await teamsCollection.insertOne(newTeam);
+    resolvedTeamId = teamResult.insertedId;
+
+    logger.info('Team created for new leader during registration', {
+      teamId: resolvedTeamId.toString(),
+      teamName: teamName.trim(),
+      leaderName: validName
+    });
+  }
   
   // Check if user already exists
   const existingUserResult = await getUserByUsername(usernameValidation.value);
@@ -92,7 +130,8 @@ export default async function handler(req, res) {
   const userData = {
     username: usernameValidation.value,
     passwordHash,
-    name: validName
+    name: validName,
+    role: role
   };
   
   // Add teamId if provided (from direct assignment or team token)
@@ -129,6 +168,35 @@ export default async function handler(req, res) {
   }
 
   const newUser = newUserResult.data;
+  
+  // Handle team assignment for leaders
+  if (role === 'leader' && resolvedTeamId) {
+    try {
+      const { ObjectId } = await import('mongodb');
+      await teamsCollection.updateOne(
+        { _id: new ObjectId(resolvedTeamId) },
+        { 
+          $set: { 
+            leaderId: newUser._id,
+            updatedAt: new Date()
+          }
+        }
+      );
+      
+      logger.info('Leader assigned to team', {
+        userId: newUser._id.toString(),
+        teamId: resolvedTeamId.toString(),
+        teamName: teamName.trim()
+      });
+    } catch (error) {
+      logger.error('Failed to assign leader to team', {
+        error: error.message,
+        userId: newUser._id.toString(),
+        teamId: resolvedTeamId.toString()
+      });
+      // Don't fail registration if team assignment fails
+    }
+  }
   
   // Generate JWT token
   const token = jwt.sign(

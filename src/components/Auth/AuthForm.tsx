@@ -17,8 +17,10 @@ interface AuthFormProps {
     name: string;
     username: string;
     password: string;
+    role: 'user' | 'leader';
     selectedTeamId: string;
     teamToken: string;
+    teamName: string;
   };
   onFormDataChange: (field: string, value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -69,6 +71,36 @@ export const AuthForm: React.FC<AuthFormProps> = ({
       />
 
       {isRegistering && (
+        <AuthFormField
+          label="Role"
+          type="select"
+          value={formData.role}
+          onChange={(value) => onFormDataChange('role', value)}
+          placeholder="Select your role"
+          required
+          disabled={loading}
+          options={[
+            { value: 'user', label: 'Team Member' },
+            { value: 'leader', label: 'Team Leader' }
+          ]}
+          helpText="Choose your role in the organization"
+        />
+      )}
+
+      {isRegistering && formData.role === 'leader' && (
+        <AuthFormField
+          label="Team Name"
+          type="text"
+          value={formData.teamName}
+          onChange={(value) => onFormDataChange('teamName', value)}
+          placeholder="Enter your team name (e.g., Marketing Team)"
+          required
+          disabled={loading}
+          helpText="A new team will be created for you"
+        />
+      )}
+
+      {isRegistering && formData.role === 'user' && (
         <TeamSelector
           teams={teams}
           selectedTeamId={formData.selectedTeamId}

@@ -13,6 +13,7 @@ interface AddUserModalProps {
     name: string
     role: 'admin' | 'leader' | 'user'
     teamId?: string
+    teamName?: string
   }) => Promise<{ success: boolean; error?: string }>
   currentUserRole: 'admin' | 'leader' | 'user'
   teams?: Array<{ _id: string; id?: string; name: string; leaderId?: string }>
@@ -31,6 +32,7 @@ export default function AddUserModal({
     name: '',
     role: 'user' as 'admin' | 'leader' | 'user',
     teamId: '',
+    teamName: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -54,9 +56,9 @@ export default function AddUserModal({
       return
     }
 
-    // Team selection required for team leaders
-    if (formData.role === 'leader' && !formData.teamId) {
-      setError('Team selection is required for team leaders')
+    // Team name required for team leaders
+    if (formData.role === 'leader' && !formData.teamName.trim()) {
+      setError('Team name is required for team leaders')
       return
     }
 
@@ -270,7 +272,7 @@ export default function AddUserModal({
           )}
         </div>
 
-        {/* Team Selection - Only show for admins creating team leaders */}
+        {/* Team Name - Only show for admins creating team leaders */}
         {currentUserRole === 'admin' && formData.role === 'leader' && (
           <div style={{ marginBottom: '20px' }}>
             <label
@@ -281,16 +283,18 @@ export default function AddUserModal({
                 fontWeight: '500',
               }}
             >
-              Team *
+              Team Name *
             </label>
-            <select
-              value={formData.teamId}
+            <input
+              type="text"
+              value={formData.teamName}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  teamId: e.target.value,
+                  teamName: e.target.value,
                 })
               }
+              placeholder="Enter team name (e.g., Marketing Team)"
               disabled={loading}
               style={{
                 width: '100%',
@@ -299,29 +303,17 @@ export default function AddUserModal({
                 borderRadius: '6px',
                 fontSize: '14px',
                 background: 'white',
-                cursor: 'pointer',
+              }}
+            />
+            <p
+              style={{
+                fontSize: '12px',
+                color: '#6b7280',
+                marginTop: '4px',
               }}
             >
-              <option value="">Select a team...</option>
-              {teams
-                .filter(team => !team.leaderId) // Only show teams without leaders
-                .map(team => (
-                  <option key={team._id || team.id} value={team._id || team.id}>
-                    {team.name}
-                  </option>
-                ))}
-            </select>
-            {teams.filter(team => !team.leaderId).length === 0 && (
-              <p
-                style={{
-                  fontSize: '12px',
-                  color: '#ef4444',
-                  marginTop: '4px',
-                }}
-              >
-                No teams available without leaders. Create a team first.
-              </p>
-            )}
+              A new team will be created automatically for this leader
+            </p>
           </div>
         )}
 

@@ -166,7 +166,7 @@ async function handleCreateUser(req, res, decoded, startTime) {
     return res.status(403).json({ success: false, error: 'Forbidden' });
   }
 
-  const { username, password, name, role } = req.body;
+  const { username, password, name, role, teamName } = req.body;
   
   // Validate inputs
   const usernameValidation = validateUsername(username);
@@ -219,26 +219,38 @@ async function handleCreateUser(req, res, decoded, startTime) {
       return res.status(400).json({ success: false, error: 'Leader is not assigned to any team' });
     }
   } else if (decoded.role === 'admin' && roleValidation.value === 'leader') {
-    // Admins creating team leaders - they need to be assigned to a team
-    // For now, we'll require the admin to specify a teamId in the request
-    const { teamId: requestedTeamId } = req.body;
+    // Admins creating team leaders - automatically create a team for them
+    const { teamName } = req.body;
     
-    if (!requestedTeamId) {
-      return res.status(400).json({ success: false, error: 'Team ID is required when creating team leaders' });
+    if (!teamName || teamName.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Team name is required when creating team leaders' });
     }
     
-    // Validate that the team exists
-    const team = await teamsCollection.findOne({ _id: new ObjectId(requestedTeamId) });
-    if (!team) {
-      return res.status(400).json({ success: false, error: 'Team not found' });
+    // Check if team name already exists
+    const existingTeam = await teamsCollection.findOne({ name: teamName.trim() });
+    if (existingTeam) {
+      return res.status(400).json({ success: false, error: 'Team name already exists' });
     }
     
-    // Check if team already has a leader
-    if (team.leaderId) {
-      return res.status(400).json({ success: false, error: 'Team already has a leader assigned' });
-    }
+    // Create new team for the leader
+    const newTeam = {
+      name: teamName.trim(),
+      description: `Team managed by ${nameValidation.value}`,
+      leaderId: null, // Will be set after user creation
+      members: [],
+      settings: getDefaultTeamSettings(),
+      createdAt: new Date(),
+      createdBy: new ObjectId(decoded.id)
+    };
     
-    teamId = new ObjectId(requestedTeamId);
+    const teamResult = await teamsCollection.insertOne(newTeam);
+    teamId = teamResult.insertedId;
+    
+    logger.info('Team created for new leader', {
+      teamId: teamId.toString(),
+      teamName: teamName.trim(),
+      createdBy: decoded.id
+    });
   }
 
   const passwordHash = await bcrypt.hash(passwordValidation.value, 10);

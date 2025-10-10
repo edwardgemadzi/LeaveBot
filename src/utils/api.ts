@@ -78,10 +78,10 @@ export const api = {
         body: JSON.stringify({ username, password }),
       }),
 
-    register: (username: string, password: string, name: string, teamId?: string, teamToken?: string) =>
+    register: (username: string, password: string, name: string, teamId?: string, teamToken?: string, teamName?: string) =>
       apiFetch<ApiResult<{ token: string; user: import('../types').User }>>('/api/register', {
         method: 'POST',
-        body: JSON.stringify({ username, password, name, teamId, teamToken }),
+        body: JSON.stringify({ username, password, name, teamId, teamToken, teamName }),
       }),
   },
 
@@ -89,6 +89,20 @@ export const api = {
   users: {
     getAll: (token: string) =>
       apiFetch<ApiResult<{ users: import('../types').User[] }>>('/api/users', { method: 'GET' }, token),
+
+    create: (userData: {
+      username: string;
+      password: string;
+      name: string;
+      role: 'admin' | 'leader' | 'user';
+      teamId?: string;
+      teamName?: string;
+      teamToken?: string;
+    }, token: string) =>
+      apiFetch<ApiResult<{ user: import('../types').User }>>('/api/users?action=create', {
+        method: 'POST',
+        body: JSON.stringify(userData),
+      }, token),
 
     getById: (userId: string, token: string) =>
       apiFetch<ApiResult<{ user: import('../types').User }>>(`/api/users?id=${userId}`, { method: 'GET' }, token),

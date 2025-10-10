@@ -76,24 +76,15 @@ export function useUserOperations(token: string) {
     name: string
     role: 'admin' | 'leader' | 'user'
     teamId?: string
+    teamName?: string
     teamToken?: string
   }) => {
     setLoading(true)
     setError('')
 
     try {
-      const result = await api.auth.register(
-        userData.username,
-        userData.password,
-        userData.name,
-        userData.teamId,
-        userData.teamToken
-      )
+      const result = await api.users.create(userData, token)
       if (result.success) {
-        // Update role if different from default
-        if (userData.role !== 'user') {
-          await updateUser(result.user.id, { role: userData.role })
-        }
         return { success: true, user: result.user }
       }
       setError(result.error || 'Failed to create user')
