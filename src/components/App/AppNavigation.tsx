@@ -1,7 +1,7 @@
 import React from 'react';
 import NavTab from '../Navigation/NavTab';
 
-type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams' | 'team-settings';
+type View = 'dashboard' | 'calendar' | 'list' | 'team' | 'teams' | 'team-settings';
 
 interface AppNavigationProps {
   currentView: View;
@@ -33,13 +33,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({
           active={currentView === 'list'}
           onClick={() => onViewChange('list')}
           icon="📋"
-          label="All Requests"
-        />
-        <NavTab
-          active={currentView === 'form'}
-          onClick={() => onViewChange('form')}
-          icon="➕"
-          label="New Request"
+          label="My Requests"
         />
         {isAdmin && (
           <>

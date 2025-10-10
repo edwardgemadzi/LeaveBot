@@ -7,7 +7,7 @@ import TeamLeaveSettings from '../TeamLeaveSettings';
 import LeaveRequestForm from '../Leaves/LeaveRequestForm';
 import { LeaveListView } from './LeaveListView';
 
-type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams' | 'team-settings';
+type View = 'dashboard' | 'calendar' | 'list' | 'team' | 'teams' | 'team-settings';
 
 interface User {
   id: string;
@@ -32,7 +32,6 @@ interface AppContentProps {
   token: string;
   isAdmin: boolean;
   teamMembers: any[];
-  requestDates: { startDate: Date; endDate: Date } | null;
   userSettings: any;
   searchFilter: { search: string; status: string };
   onViewChange: (view: View) => void;
@@ -40,8 +39,6 @@ interface AppContentProps {
   onRequestLeave: (startDate: Date, endDate: Date) => void;
   onStatusUpdate: (leaveId: string, status: 'approved' | 'rejected') => Promise<void>;
   onFilterChange: (filter: { search: string; status: string }) => void;
-  onFormSuccess: () => void;
-  onFormCancel: () => void;
   showToast: (message: string) => void;
   showError: (message: string) => void;
 }
@@ -55,7 +52,6 @@ export const AppContent: React.FC<AppContentProps> = ({
   token,
   isAdmin,
   teamMembers,
-  requestDates,
   userSettings,
   searchFilter,
   onViewChange,
@@ -63,8 +59,6 @@ export const AppContent: React.FC<AppContentProps> = ({
   onRequestLeave,
   onStatusUpdate,
   onFilterChange,
-  onFormSuccess,
-  onFormCancel,
   showToast,
   showError
 }) => {
@@ -85,9 +79,10 @@ export const AppContent: React.FC<AppContentProps> = ({
           user={user}
           userSettings={userSettings}
           token={token}
-          onRequestLeave={onRequestLeave}
+          teamMembers={teamMembers}
           onRefresh={onLeaveUpdate}
           showToast={showToast}
+          showError={showError}
         />
       )}
 
@@ -104,22 +99,11 @@ export const AppContent: React.FC<AppContentProps> = ({
           token={token}
           showToast={showToast}
           showError={showError}
+          user={user}
         />
       )}
 
-      {currentView === 'form' && (
-        <LeaveRequestForm
-          user={user}
-          token={token}
-          teamMembers={teamMembers}
-          initialStartDate={requestDates?.startDate}
-          initialEndDate={requestDates?.endDate}
-          onSuccess={onFormSuccess}
-          onCancel={onFormCancel}
-          showToast={showToast}
-          showError={showError}
-        />
-      )}
+      {/* Form is now handled as a popup in the calendar */}
 
       {currentView === 'team' && isAdmin && (
         <UserManagementRefactored currentUser={user} token={token} />

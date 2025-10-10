@@ -20,7 +20,11 @@ export function useTeams(token: string, autoLoad = true) {
 
     try {
       const data = await api.teams.getAll(token)
-      setTeams((data.teams || []).map(normalizeTeam))
+      if (data.success) {
+        setTeams((data.teams || []).map(normalizeTeam))
+      } else {
+        setError(data.error || 'Failed to load teams')
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)

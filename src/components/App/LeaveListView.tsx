@@ -12,6 +12,12 @@ interface Leave {
   status: string;
 }
 
+interface User {
+  id: string;
+  name: string;
+  role: string;
+}
+
 interface LeaveListViewProps {
   leaves: Leave[];
   loading: boolean;
@@ -24,6 +30,7 @@ interface LeaveListViewProps {
   token: string;
   showToast: (message: string) => void;
   showError: (message: string) => void;
+  user: User;
 }
 
 export const LeaveListView: React.FC<LeaveListViewProps> = ({
@@ -37,12 +44,15 @@ export const LeaveListView: React.FC<LeaveListViewProps> = ({
   onStatusUpdate,
   token,
   showToast,
-  showError
+  showError,
+  user
 }) => {
   return (
     <div>
       <div className="flex justify-between items-center mb-5">
-        <h2 className="m-0 text-gray-800 text-2xl">📋 All Leave Requests</h2>
+        <h2 className="m-0 text-gray-800 text-2xl">
+          📋 {user.role === 'user' ? 'My Leave Requests' : 'All Leave Requests'}
+        </h2>
       </div>
 
       <SearchFilter
@@ -66,8 +76,8 @@ export const LeaveListView: React.FC<LeaveListViewProps> = ({
               : 'Submit your first leave request to get started'
           }
           action={
-            !searchFilter.search && !searchFilter.status
-              ? { label: 'Request Leave', onClick: () => onViewChange('form') }
+            !searchFilter.search && !searchFilter.status && user.role === 'user'
+              ? { label: 'Request Leave', onClick: () => onViewChange('calendar') }
               : undefined
           }
         />

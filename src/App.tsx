@@ -15,7 +15,7 @@ import { useUserSettings } from './hooks/useUserSettings'
 import { useTeamMembers } from './hooks/useTeamMembers'
 import { useAutoRefresh } from './hooks/useAutoRefresh'
 
-type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams' | 'team-settings'
+type View = 'dashboard' | 'calendar' | 'list' | 'team' | 'teams' | 'team-settings'
 
 function App() {
   const { user, token, loading: authLoading, error: authError, login, register, logout, isAuthenticated } = useAuth()
@@ -28,7 +28,7 @@ function App() {
   const [showProfileSettings, setShowProfileSettings] = useState(false)
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const { settings: userSettings } = useUserSettings(user?.id, token)
-  const [requestDates, setRequestDates] = useState<{ startDate: Date; endDate: Date } | null>(null)
+  // Remove requestDates state - no longer needed
 
   // Auto-refresh leaves every 30 seconds
   useAutoRefresh(refetchLeaves, isAuthenticated, 30000)
@@ -37,9 +37,14 @@ function App() {
   const { members } = useTeamMembers(token, !!user && (user.role === 'admin' || user.role === 'leader'))
   useEffect(() => { setTeamMembers(members as any[]) }, [members])
 
-  // Filter leaves based on search and status
+  // Filter leaves based on search, status, and user role
   const filteredLeaves = useMemo(() => {
     return leaves.filter((leave) => {
+      // For regular users, only show their own requests
+      if (user?.role === 'user' && leave.userId !== user.id) {
+        return false
+      }
+
       const matchesSearch =
         !searchFilter.search ||
         leave.employeeName.toLowerCase().includes(searchFilter.search.toLowerCase()) ||
@@ -49,7 +54,7 @@ function App() {
 
       return matchesSearch && matchesStatus
     })
-  }, [leaves, searchFilter])
+  }, [leaves, searchFilter, user])
 
   const handleStatusUpdate = async (leaveId: string, status: 'approved' | 'rejected') => {
     const result = await updateLeaveStatus(leaveId, status)
@@ -92,7 +97,6 @@ function App() {
       leavesLoading={leavesLoading}
       isAdmin={isAdmin}
       teamMembers={teamMembers}
-      requestDates={requestDates}
       userSettings={userSettings}
       searchFilter={searchFilter}
       showProfileSettings={showProfileSettings}
@@ -101,17 +105,9 @@ function App() {
       onSettingsClick={() => setShowProfileSettings(true)}
       onLogout={logout}
       onLeaveUpdate={refetchLeaves}
-      onRequestLeave={(startDate, endDate) => {
-        setRequestDates({ startDate, endDate })
-        setCurrentView('form')
-      }}
+      onRequestLeave={() => {}} // Will be handled by calendar popup
       onStatusUpdate={handleStatusUpdate}
       onFilterChange={setSearchFilter}
-      onFormSuccess={() => {
-        refetchLeaves()
-        setCurrentView('list')
-      }}
-      onFormCancel={() => setCurrentView('dashboard')}
       onCloseProfileSettings={() => setShowProfileSettings(false)}
       onCloseToast={closeToast}
       showToast={success}

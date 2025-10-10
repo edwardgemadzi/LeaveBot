@@ -23,15 +23,7 @@ interface TeamSettingsModalProps {
       }
       annualLeaveDays: number
       defaults?: {
-        workingDays: {
-          monday: boolean
-          tuesday: boolean
-          wednesday: boolean
-          thursday: boolean
-          friday: boolean
-          saturday: boolean
-          sunday: boolean
-        }
+        // No default working days - each user manages their own
       }
     }
   }
@@ -48,15 +40,7 @@ const defaultSettings = {
   },
   annualLeaveDays: 21,
   defaults: {
-    workingDays: {
-      monday: true,
-      tuesday: true,
-      wednesday: true,
-      thursday: true,
-      friday: true,
-      saturday: false,
-      sunday: false
-    }
+    // No default working days - each user manages their own
   }
 }
 

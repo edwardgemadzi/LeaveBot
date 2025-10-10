@@ -5,7 +5,7 @@ import { AppContent } from './AppContent';
 import UserProfileModal from '../UserProfileModal';
 import { ToastContainer, Toast as ToastType } from '../Toast';
 
-type View = 'dashboard' | 'calendar' | 'list' | 'form' | 'team' | 'teams' | 'team-settings';
+type View = 'dashboard' | 'calendar' | 'list' | 'team' | 'teams' | 'team-settings';
 
 interface User {
   id: string;
@@ -30,7 +30,6 @@ interface AppLayoutProps {
   leavesLoading: boolean;
   isAdmin: boolean;
   teamMembers: any[];
-  requestDates: { startDate: Date; endDate: Date } | null;
   userSettings: any;
   searchFilter: { search: string; status: string };
   showProfileSettings: boolean;
@@ -42,8 +41,6 @@ interface AppLayoutProps {
   onRequestLeave: (startDate: Date, endDate: Date) => void;
   onStatusUpdate: (leaveId: string, status: 'approved' | 'rejected') => Promise<void>;
   onFilterChange: (filter: { search: string; status: string }) => void;
-  onFormSuccess: () => void;
-  onFormCancel: () => void;
   onCloseProfileSettings: () => void;
   onCloseToast: (id: string) => void;
   showToast: (message: string) => void;
@@ -59,7 +56,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   leavesLoading,
   isAdmin,
   teamMembers,
-  requestDates,
   userSettings,
   searchFilter,
   showProfileSettings,
@@ -71,8 +67,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onRequestLeave,
   onStatusUpdate,
   onFilterChange,
-  onFormSuccess,
-  onFormCancel,
   onCloseProfileSettings,
   onCloseToast,
   showToast,
@@ -105,7 +99,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         token={token}
         isAdmin={isAdmin}
         teamMembers={teamMembers}
-        requestDates={requestDates}
         userSettings={userSettings}
         searchFilter={searchFilter}
         onViewChange={onViewChange}
@@ -113,8 +106,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         onRequestLeave={onRequestLeave}
         onStatusUpdate={onStatusUpdate}
         onFilterChange={onFilterChange}
-        onFormSuccess={onFormSuccess}
-        onFormCancel={onFormCancel}
         showToast={showToast}
         showError={showError}
       />

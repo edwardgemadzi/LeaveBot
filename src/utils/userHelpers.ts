@@ -15,7 +15,11 @@ export function canManageUser(currentUser: User, targetUser: User): boolean {
 
   // Leaders can only manage regular users in their team
   if (currentUser.role === 'leader') {
-    return targetUser.role === 'user' && targetUser.teamId === currentUser.teamId
+    // Convert teamId to string for comparison (in case it's an ObjectId)
+    const currentUserTeamId = currentUser.teamId?.toString()
+    const targetUserTeamId = targetUser.teamId?.toString()
+    
+    return targetUser.role === 'user' && currentUserTeamId === targetUserTeamId
   }
 
   return false

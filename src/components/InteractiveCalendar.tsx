@@ -6,8 +6,9 @@ import { useTeamMembersSettings } from '../hooks/useTeamMembersSettings'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
 import { getEventStyle, getDayStyle } from '../utils/calendarStyles'
 import { CalendarControls, CalendarContainer, CalendarLegend, useCalendarEventHandlers } from './Calendar'
+import LeaveRequestForm from './Leaves/LeaveRequestForm'
 
-function CalendarHeader({ user, onRequestLeave }: { user: User; onRequestLeave?: (startDate: Date, endDate: Date) => void }) {
+function CalendarHeader({ user, onShowRequestForm }: { user: User; onShowRequestForm?: () => void }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
       <div>
@@ -15,16 +16,12 @@ function CalendarHeader({ user, onRequestLeave }: { user: User; onRequestLeave?:
           {user.role === 'admin' ? 'Team Leave Calendar' : 'Leave Calendar'}
         </h2>
         <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-          {user.role === 'user' ? 'Click and drag on the calendar to select dates for a new leave request' : 'View team leave schedules and manage approvals'}
+          {user.role === 'user' ? 'Click the button below to request leave or drag on the calendar to select dates' : 'View team leave schedules and manage approvals'}
         </p>
       </div>
-      {onRequestLeave && (
+      {user.role === 'user' && onShowRequestForm && (
         <button
-          onClick={() => {
-            const today = new Date()
-            const tomorrow = addDays(today, 1)
-            onRequestLeave(today, tomorrow)
-          }}
+          onClick={onShowRequestForm}
           className="btn-primary"
           style={{
             display: 'flex',
@@ -48,15 +45,18 @@ interface LeaveCalendarProps {
   leaves: Leave[]
   userSettings?: UserSettings | null
   token: string
-  onRequestLeave?: (startDate: Date, endDate: Date) => void
+  teamMembers: any[]
   onRefresh?: () => void
   showToast?: (message: string) => void
+  showError?: (message: string) => void
 }
 
-export default function LeaveCalendar({ user, leaves, userSettings, token, onRequestLeave, onRefresh, showToast }: LeaveCalendarProps) {
+export default function LeaveCalendar({ user, leaves, userSettings, token, teamMembers, onRefresh, showToast, showError }: LeaveCalendarProps) {
   const [view, setView] = useState<string>('month')
-  // Default to showing team leaves for both leaders and regular users
-  const [showTeamOnly, setShowTeamOnly] = useState(true)
+  const [showRequestForm, setShowRequestForm] = useState(false)
+  const [selectedDates, setSelectedDates] = useState<{ startDate: Date; endDate: Date } | null>(null)
+  // All team members should see the team calendar (no toggle needed)
+  const showTeamOnly = true
   
   // Fetch all team members' settings using custom hook
   const { teamMembersSettings } = useTeamMembersSettings(leaves, token)
@@ -64,34 +64,39 @@ export default function LeaveCalendar({ user, leaves, userSettings, token, onReq
   // Generate calendar events using custom hook
   const events = useCalendarEvents({ leaves, user, showTeamOnly, teamMembersSettings })
 
-  // Use custom hook for event handlers
-  const { handleSelectSlot, handleSelectEvent } = useCalendarEventHandlers({
-    user,
-    userSettings,
-    onRequestLeave,
-    showToast
-  });
+  // Handle slot selection for leave requests
+  const handleSelectSlot = (slotInfo: any) => {
+    if (user.role === 'user') {
+      setSelectedDates({
+        startDate: slotInfo.start,
+        endDate: slotInfo.end
+      })
+      setShowRequestForm(true)
+    }
+  }
+
+  // Handle event selection
+  const handleSelectEvent = (event: CalendarEvent) => {
+    // Could show event details in a popup if needed
+    console.log('Selected event:', event)
+  }
 
   const eventStyleGetter = (event: CalendarEvent) => {
     return getEventStyle(event, user)
   }
 
-  // Style non-working days differently to show user's actual working days
+  // No special day styling - all team members see the same calendar
   const dayPropGetter = (date: Date) => {
-    return getDayStyle(date, userSettings)
+    return {} // No special styling for consistency across team members
   }
 
   return (
     <div className="p-5">
-      <CalendarHeader user={user} onRequestLeave={onRequestLeave} />
+      <CalendarHeader user={user} onShowRequestForm={() => setShowRequestForm(true)} />
       
-      <CalendarControls
-        user={user}
-        showTeamOnly={showTeamOnly}
-        onShowTeamOnlyChange={setShowTeamOnly}
-      />
+      {/* Remove calendar controls - all team members see the same team calendar */}
 
-      <CalendarLegend userSettings={userSettings} />
+      {/* Remove calendar legend - all team members see the same calendar */}
 
       <CalendarContainer
         events={events}
@@ -102,6 +107,33 @@ export default function LeaveCalendar({ user, leaves, userSettings, token, onReq
         eventStyleGetter={eventStyleGetter}
         dayPropGetter={dayPropGetter}
       />
+
+      {/* Leave Request Form Popup */}
+      {showRequestForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]">
+          <div className="bg-white rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-2xl">
+            <LeaveRequestForm
+              user={user}
+              token={token}
+              teamMembers={teamMembers}
+              initialStartDate={selectedDates?.startDate}
+              initialEndDate={selectedDates?.endDate}
+              onSuccess={() => {
+                setShowRequestForm(false)
+                setSelectedDates(null)
+                if (onRefresh) onRefresh()
+                if (showToast) showToast('Leave request submitted successfully!')
+              }}
+              onCancel={() => {
+                setShowRequestForm(false)
+                setSelectedDates(null)
+              }}
+              showToast={showToast || (() => {})}
+              showError={showError || (() => {})}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
