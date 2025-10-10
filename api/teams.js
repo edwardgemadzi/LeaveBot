@@ -106,10 +106,33 @@ async function handleListTeams(req, res, decoded, startTime) {
 
     let query = {};
     if (decoded.role === 'leader') {
-      query = { leaderId: new ObjectId(decoded.id) };
+      // Validate that decoded.id exists and is a valid ObjectId string
+      if (!decoded.id) {
+        logger.error('Leader ID missing from JWT token', { userId: decoded.id, role: decoded.role });
+        return res.status(400).json({ success: false, error: 'Invalid user ID in token' });
+      }
+      
+      try {
+        // decoded.id is already a string from JWT token, convert to ObjectId for database query
+        query = { leaderId: new ObjectId(decoded.id) };
+      } catch (objectIdError) {
+        logger.error('Invalid ObjectId format for leader ID', { 
+          userId: decoded.id, 
+          error: objectIdError.message,
+          role: decoded.role 
+        });
+        return res.status(400).json({ success: false, error: 'Invalid user ID format' });
+      }
     }
 
     const teams = await teamsCollection.find(query).toArray();
+    
+    logger.info('Teams query executed', { 
+      userId: decoded.id, 
+      role: decoded.role, 
+      query: query, 
+      teamCount: teams.length 
+    });
     
     const teamsWithDetails = await Promise.all(
       teams.map(async (team) => {
