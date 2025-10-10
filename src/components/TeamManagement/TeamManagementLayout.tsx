@@ -35,10 +35,12 @@ interface TeamManagementLayoutProps {
   onSettings: (team: Team) => void;
   onViewMembers: (team: Team) => void;
   onDelete: (team: Team) => void;
+  onGenerateToken: (team: Team) => void;
   onCloseCreateModal: () => void;
   onCloseEditModal: () => void;
   onCloseMembersModal: () => void;
   onCloseSettingsModal: () => void;
+  onCloseTokenModal: () => void;
   onCreateTeamSubmit: (teamData: any) => Promise<{ success: boolean; error?: string }>;
   onUpdateTeamSubmit: (teamData: any) => Promise<{ success: boolean; error?: string }>;
   onAssignUser: (teamId: string, userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -64,10 +66,12 @@ export const TeamManagementLayout: React.FC<TeamManagementLayoutProps> = ({
   onSettings,
   onViewMembers,
   onDelete,
+  onGenerateToken,
   onCloseCreateModal,
   onCloseEditModal,
   onCloseMembersModal,
   onCloseSettingsModal,
+  onCloseTokenModal,
   onCreateTeamSubmit,
   onUpdateTeamSubmit,
   onAssignUser,
@@ -94,6 +98,7 @@ export const TeamManagementLayout: React.FC<TeamManagementLayoutProps> = ({
         onSettings={onSettings}
         onViewMembers={onViewMembers}
         onDelete={onDelete}
+        onGenerateToken={onGenerateToken}
         canEditTeam={canEditTeam}
       />
 

@@ -10,6 +10,7 @@ import { useUsers } from '../hooks/useUsers'
 import { useTeamOperations } from '../hooks/useTeamOperations'
 import { canManageTeams, canEditTeam, getAvailableLeaders } from '../utils/teamHelpers'
 import { TeamManagementLayout } from './TeamManagement'
+import TeamTokenModal from './TeamManagement/TeamTokenModal'
 
 interface TeamManagementProps {
   currentUser: User
@@ -34,6 +35,7 @@ export default function TeamManagement({
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [membersTeam, setMembersTeam] = useState<Team | null>(null)
   const [settingsTeam, setSettingsTeam] = useState<Team | null>(null)
+  const [tokenTeam, setTokenTeam] = useState<Team | null>(null)
   const [localError, setLocalError] = useState('')
 
   const leaders = getAvailableLeaders(users)
@@ -139,10 +141,12 @@ export default function TeamManagement({
       onSettings={setSettingsTeam}
       onViewMembers={setMembersTeam}
       onDelete={handleDeleteTeam}
+      onGenerateToken={setTokenTeam}
       onCloseCreateModal={() => setShowCreateModal(false)}
       onCloseEditModal={() => setEditingTeam(null)}
       onCloseMembersModal={() => setMembersTeam(null)}
       onCloseSettingsModal={() => setSettingsTeam(null)}
+      onCloseTokenModal={() => setTokenTeam(null)}
       onCreateTeamSubmit={handleCreateTeam}
       onUpdateTeamSubmit={handleUpdateTeam}
       onAssignUser={handleAssignUser}
@@ -150,5 +154,15 @@ export default function TeamManagement({
       onRefetchTeams={refetchTeams}
       canEditTeam={canEditTeam}
     />
+
+    {/* Team Token Modal */}
+    {tokenTeam && (
+      <TeamTokenModal
+        isOpen={true}
+        onClose={() => setTokenTeam(null)}
+        team={tokenTeam}
+        token={token}
+      />
+    )}
   )
 }

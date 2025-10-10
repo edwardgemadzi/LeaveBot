@@ -23,6 +23,13 @@ interface Leave {
   status: string;
 }
 
+interface Team {
+  _id: string;
+  id?: string;
+  name: string;
+  leaderId?: string;
+}
+
 interface AppContentProps {
   currentView: View;
   leaves: Leave[];
@@ -32,6 +39,7 @@ interface AppContentProps {
   token: string;
   isAdmin: boolean;
   teamMembers: any[];
+  teams?: Team[];
   userSettings: any;
   searchFilter: { search: string; status: string };
   onViewChange: (view: View) => void;
@@ -52,6 +60,7 @@ export const AppContent: React.FC<AppContentProps> = ({
   token,
   isAdmin,
   teamMembers,
+  teams = [],
   userSettings,
   searchFilter,
   onViewChange,
@@ -106,7 +115,7 @@ export const AppContent: React.FC<AppContentProps> = ({
       {/* Form is now handled as a popup in the calendar */}
 
       {currentView === 'team' && isAdmin && (
-        <UserManagementRefactored currentUser={user} token={token} />
+        <UserManagementRefactored currentUser={user} token={token} teams={teams} />
       )}
 
       {currentView === 'teams' && isAdmin && (

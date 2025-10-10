@@ -203,13 +203,42 @@ async function handleCreateUser(req, res, decoded, startTime) {
     return res.status(400).json({ success: false, error: 'Username already exists' });
   }
 
-  // If leader is creating the user, get their team and auto-assign
+  // Auto-assign users to teams based on role and creator
   let teamId = null;
+  
   if (decoded.role === 'leader') {
+    // Leaders can only create team members (users) - auto-assign to their team
+    if (roleValidation.value !== 'user') {
+      return res.status(403).json({ success: false, error: 'Leaders can only create team members (users)' });
+    }
+    
     const leaderTeam = await teamsCollection.findOne({ leaderId: new ObjectId(decoded.id) });
     if (leaderTeam) {
       teamId = leaderTeam._id;
+    } else {
+      return res.status(400).json({ success: false, error: 'Leader is not assigned to any team' });
     }
+  } else if (decoded.role === 'admin' && roleValidation.value === 'leader') {
+    // Admins creating team leaders - they need to be assigned to a team
+    // For now, we'll require the admin to specify a teamId in the request
+    const { teamId: requestedTeamId } = req.body;
+    
+    if (!requestedTeamId) {
+      return res.status(400).json({ success: false, error: 'Team ID is required when creating team leaders' });
+    }
+    
+    // Validate that the team exists
+    const team = await teamsCollection.findOne({ _id: new ObjectId(requestedTeamId) });
+    if (!team) {
+      return res.status(400).json({ success: false, error: 'Team not found' });
+    }
+    
+    // Check if team already has a leader
+    if (team.leaderId) {
+      return res.status(400).json({ success: false, error: 'Team already has a leader assigned' });
+    }
+    
+    teamId = new ObjectId(requestedTeamId);
   }
 
   const passwordHash = await bcrypt.hash(passwordValidation.value, 10);
@@ -228,15 +257,29 @@ async function handleCreateUser(req, res, decoded, startTime) {
 
   const result = await usersCollection.insertOne(newUser);
 
-  // If user was assigned to a team, add them to team members array
+  // Handle team assignment based on user role
   if (teamId) {
-    await teamsCollection.updateOne(
-      { _id: teamId },
-      { 
-        $addToSet: { members: result.insertedId },
-        $set: { updatedAt: new Date() }
-      }
-    );
+    if (roleValidation.value === 'leader') {
+      // Assign leader to team
+      await teamsCollection.updateOne(
+        { _id: teamId },
+        { 
+          $set: { 
+            leaderId: result.insertedId,
+            updatedAt: new Date()
+          }
+        }
+      );
+    } else {
+      // Add regular user to team members array
+      await teamsCollection.updateOne(
+        { _id: teamId },
+        { 
+          $addToSet: { members: result.insertedId },
+          $set: { updatedAt: new Date() }
+        }
+      );
+    }
   }
 
   logger.info('User created', { 

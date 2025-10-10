@@ -8,6 +8,7 @@ import './App.css'
 import { useAuth } from './hooks/useAuth'
 import { useLeaves } from './hooks/useLeaves'
 import { useUsers } from './hooks/useUsers'
+import { useTeams } from './hooks/useTeams'
 import { useToast } from './hooks/useToast'
 import Authentication from './components/Auth/Authentication'
 import { AppLayout } from './components/App'
@@ -21,6 +22,7 @@ function App() {
   const { user, token, loading: authLoading, error: authError, login, register, logout, isAuthenticated } = useAuth()
   const { leaves, loading: leavesLoading, updateLeaveStatus, refetch: refetchLeaves } = useLeaves(token, isAuthenticated)
   const { users } = useUsers(token, false)
+  const { teams } = useTeams(token, isAuthenticated)
   const { toasts, success, error: showError, closeToast } = useToast()
 
   const [currentView, setCurrentView] = useState<View>('dashboard')
@@ -97,6 +99,7 @@ function App() {
       leavesLoading={leavesLoading}
       isAdmin={isAdmin}
       teamMembers={teamMembers}
+      teams={teams}
       userSettings={userSettings}
       searchFilter={searchFilter}
       showProfileSettings={showProfileSettings}

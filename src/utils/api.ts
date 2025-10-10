@@ -78,10 +78,10 @@ export const api = {
         body: JSON.stringify({ username, password }),
       }),
 
-    register: (username: string, password: string, name: string, teamId?: string) =>
+    register: (username: string, password: string, name: string, teamId?: string, teamToken?: string) =>
       apiFetch<ApiResult<{ token: string; user: import('../types').User }>>('/api/register', {
         method: 'POST',
-        body: JSON.stringify({ username, password, name, teamId }),
+        body: JSON.stringify({ username, password, name, teamId, teamToken }),
       }),
   },
 
@@ -186,6 +186,9 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(settings),
       }, token),
+
+    generateToken: (teamId: string, token: string) =>
+      apiFetch<ApiResult<{ teamToken: string; teamName: string; expiresIn: string }>>(`/api/teams?id=${teamId}&action=token`, { method: 'GET' }, token),
 
     delete: (teamId: string, token: string) =>
       apiFetch<ApiResult<{}>>(`/api/teams?id=${teamId}`, { method: 'DELETE' }, token),

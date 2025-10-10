@@ -14,6 +14,7 @@ interface TeamCardProps {
   onSettings: () => void
   onViewMembers: () => void
   onDelete: () => void
+  onGenerateToken: () => void
 }
 
 export default function TeamCard({
@@ -24,6 +25,7 @@ export default function TeamCard({
   onSettings,
   onViewMembers,
   onDelete,
+  onGenerateToken,
 }: TeamCardProps) {
   const memberCount = getTeamMemberCount(team)
   // Use utility function for consistent team ID comparison
@@ -121,6 +123,25 @@ export default function TeamCard({
         >
           👥 Members
         </button>
+
+        {/* Team token generation - only for team leaders and admins */}
+        {(currentUser.role === 'leader' && isOwnTeam) || currentUser.role === 'admin' ? (
+          <button
+            onClick={onGenerateToken}
+            style={{
+              padding: '8px 12px',
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '500',
+            }}
+          >
+            🔑 Token
+          </button>
+        ) : null}
 
         {canEdit && (
           <>

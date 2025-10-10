@@ -12,7 +12,8 @@ interface AuthenticationProps {
     username: string,
     password: string,
     name: string,
-    teamId?: string
+    teamId?: string,
+    teamToken?: string
   ) => Promise<{ success: boolean; error?: string }>
   loading: boolean
   error: string
@@ -29,6 +30,7 @@ export default function Authentication({
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [selectedTeamId, setSelectedTeamId] = useState('')
+  const [teamToken, setTeamToken] = useState('')
   const [localError, setLocalError] = useState('')
 
   const { teams } = useTeams('', !isRegistering)
@@ -47,7 +49,7 @@ export default function Authentication({
     e.preventDefault()
     setLocalError('')
 
-    const result = await onRegister(username, password, name, selectedTeamId || undefined)
+    const result = await onRegister(username, password, name, selectedTeamId || undefined, teamToken || undefined)
     if (!result.success) {
       setLocalError(result.error || 'Registration failed')
     }
@@ -61,7 +63,8 @@ export default function Authentication({
     name,
     username,
     password,
-    selectedTeamId
+    selectedTeamId,
+    teamToken
   };
 
   const handleFormDataChange = (field: string, value: string) => {
@@ -77,6 +80,9 @@ export default function Authentication({
         break;
       case 'selectedTeamId':
         setSelectedTeamId(value);
+        break;
+      case 'teamToken':
+        setTeamToken(value);
         break;
     }
   };

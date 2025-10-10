@@ -54,6 +54,8 @@ export default async (req, res) => {
     if (req.method === 'GET') {
       if (action === 'settings' && teamId) {
         return await handleGetTeamSettings(req, res, decoded, startTime, teamId);
+      } else if (action === 'token' && teamId) {
+        return await handleGenerateTeamToken(req, res, decoded, startTime, teamId);
       } else if (teamId) {
         return await handleGetTeamDetails(req, res, decoded, startTime, teamId);
       } else {
@@ -931,5 +933,95 @@ async function handleUpdateTeamSettings(req, res, decoded, startTime, teamId) {
     const duration = Date.now() - startTime;
     logger.error('Error updating team settings', { error: err.message, teamId, userId: decoded.id, duration });
     return res.status(500).json({ success: false, error: 'Failed to update team settings' });
+  }
+}
+
+// Handler for generating team registration tokens
+async function handleGenerateTeamToken(req, res, decoded, startTime, teamId) {
+  // Rate limiting for mutations
+  const rateLimit = rateLimiters.mutation(req);
+  Object.entries(rateLimit.headers || {}).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  
+  if (!rateLimit.allowed) {
+    logger.warn('Rate limit exceeded', { endpoint: '/api/teams', action: 'token', ip: req.headers['x-forwarded-for'] });
+    return res.status(429).json({ success: false, error: rateLimit.message });
+  }
+
+  // Only team leaders and admins can generate team tokens
+  if (!['admin', 'leader'].includes(decoded.role)) {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+
+  if (!teamId) {
+    return res.status(400).json({ success: false, error: 'Team ID is required' });
+  }
+
+  const client = await connectDB();
+  const db = client.db('leavebot');
+  const teamsCollection = db.collection('teams');
+
+  try {
+    // Validate team ID format
+    if (!validateObjectId(teamId)) {
+      return res.status(400).json({ success: false, error: 'Invalid team ID format' });
+    }
+
+    // Get team details
+    const team = await teamsCollection.findOne({ _id: new ObjectId(teamId) });
+    if (!team) {
+      return res.status(404).json({ success: false, error: 'Team not found' });
+    }
+
+    // Check permissions
+    if (decoded.role === 'leader') {
+      // Leaders can only generate tokens for their own team
+      if (!team.leaderId || team.leaderId.toString() !== decoded.id) {
+        return res.status(403).json({ success: false, error: 'You can only generate tokens for your own team' });
+      }
+    }
+
+    // Generate a secure team token
+    const teamToken = jwt.sign(
+      { 
+        teamId: team._id.toString(),
+        teamName: team.name,
+        type: 'team_registration',
+        generatedBy: decoded.id,
+        generatedAt: new Date().toISOString()
+      },
+      JWT_SECRET,
+      { expiresIn: '30d' } // Token expires in 30 days
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info('Team registration token generated', {
+      teamId: team._id.toString(),
+      teamName: team.name,
+      generatedBy: decoded.id,
+      generatedByRole: decoded.role,
+      duration
+    });
+
+    return res.status(200).json({
+      success: true,
+      teamToken,
+      teamName: team.name,
+      expiresIn: '30 days',
+      message: 'Team registration token generated successfully'
+    });
+
+  } catch (err) {
+    const duration = Date.now() - startTime;
+    logger.error('Error generating team token', { 
+      error: err.message, 
+      stack: err.stack,
+      teamId, 
+      userId: decoded.id, 
+      role: decoded.role,
+      duration 
+    });
+    return res.status(500).json({ success: false, error: 'Failed to generate team token' });
   }
 }

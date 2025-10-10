@@ -13,9 +13,17 @@ interface User {
   leaveBalance?: number;
 }
 
+interface Team {
+  _id: string;
+  id?: string;
+  name: string;
+  leaderId?: string;
+}
+
 interface UserManagementLayoutProps {
   currentUser: User;
   users: User[];
+  teams?: Team[];
   error: string;
   localError: string;
   showAddModal: boolean;
@@ -42,6 +50,7 @@ interface UserManagementLayoutProps {
 export const UserManagementLayout: React.FC<UserManagementLayoutProps> = ({
   currentUser,
   users,
+  teams = [],
   error,
   localError,
   showAddModal,
@@ -93,6 +102,7 @@ export const UserManagementLayout: React.FC<UserManagementLayoutProps> = ({
         settingsUser={settingsUser}
         currentUser={currentUser}
         token={token}
+        teams={teams}
         onCloseAddModal={onCloseAddModal}
         onCloseEditModal={onCloseEditModal}
         onClosePasswordModal={onClosePasswordModal}

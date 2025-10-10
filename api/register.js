@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: rateLimit.message });
   }
 
-  const { username, password, name, teamId } = req.body;
+  const { username, password, name, teamId, teamToken } = req.body;
   
   // Validate inputs using validators
   const usernameValidation = validateUsername(username);
@@ -49,6 +49,34 @@ export default async function handler(req, res) {
 
   const nameValidation = validateName(name, false);
   const validName = nameValidation.valid ? nameValidation.value : usernameValidation.value;
+  
+  // Handle team token validation for regular user registration
+  let resolvedTeamId = teamId;
+  if (teamToken) {
+    try {
+      const decodedToken = jwt.verify(teamToken, JWT_SECRET);
+      
+      // Validate token type and structure
+      if (decodedToken.type !== 'team_registration' || !decodedToken.teamId) {
+        return res.status(400).json({ error: 'Invalid team token format' });
+      }
+      
+      // Use team ID from token
+      resolvedTeamId = decodedToken.teamId;
+      
+      logger.info('Team token validated for registration', { 
+        username: usernameValidation.value,
+        teamId: resolvedTeamId,
+        teamName: decodedToken.teamName 
+      });
+    } catch (tokenError) {
+      logger.warn('Invalid team token provided', { 
+        username: usernameValidation.value,
+        error: tokenError.message 
+      });
+      return res.status(400).json({ error: 'Invalid or expired team token' });
+    }
+  }
   
   // Check if user already exists
   const existingUserResult = await getUserByUsername(usernameValidation.value);
@@ -67,10 +95,10 @@ export default async function handler(req, res) {
     name: validName
   };
   
-  // Add teamId if provided
-  if (teamId) {
+  // Add teamId if provided (from direct assignment or team token)
+  if (resolvedTeamId) {
     const { ObjectId } = await import('mongodb');
-    userData.teamId = new ObjectId(teamId);
+    userData.teamId = new ObjectId(resolvedTeamId);
     
     // Apply team default settings if available
     try {
@@ -81,7 +109,7 @@ export default async function handler(req, res) {
         userData.settings = team.settings.defaults;
         logger.info('Applied team default settings to new user', { 
           username: usernameValidation.value, 
-          teamId: teamId 
+          teamId: resolvedTeamId 
         });
       }
     } catch (error) {

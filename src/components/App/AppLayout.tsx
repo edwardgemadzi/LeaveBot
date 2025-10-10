@@ -22,6 +22,13 @@ interface Leave {
 }
 
 
+interface Team {
+  _id: string;
+  id?: string;
+  name: string;
+  leaderId?: string;
+}
+
 interface AppLayoutProps {
   user: User;
   currentView: View;
@@ -30,6 +37,7 @@ interface AppLayoutProps {
   leavesLoading: boolean;
   isAdmin: boolean;
   teamMembers: any[];
+  teams?: Team[];
   userSettings: any;
   searchFilter: { search: string; status: string };
   showProfileSettings: boolean;
@@ -56,6 +64,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   leavesLoading,
   isAdmin,
   teamMembers,
+  teams = [],
   userSettings,
   searchFilter,
   showProfileSettings,
@@ -99,6 +108,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         token={token}
         isAdmin={isAdmin}
         teamMembers={teamMembers}
+        teams={teams}
         userSettings={userSettings}
         searchFilter={searchFilter}
         onViewChange={onViewChange}

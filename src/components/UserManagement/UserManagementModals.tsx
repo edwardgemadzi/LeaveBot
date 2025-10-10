@@ -12,6 +12,13 @@ interface User {
   role: string;
 }
 
+interface Team {
+  _id: string;
+  id?: string;
+  name: string;
+  leaderId?: string;
+}
+
 interface UserManagementModalsProps {
   showAddModal: boolean;
   editingUser: User | null;
@@ -19,6 +26,7 @@ interface UserManagementModalsProps {
   settingsUser: User | null;
   currentUser: User;
   token: string;
+  teams?: Team[];
   onCloseAddModal: () => void;
   onCloseEditModal: () => void;
   onClosePasswordModal: () => void;
@@ -36,6 +44,7 @@ export const UserManagementModals: React.FC<UserManagementModalsProps> = ({
   settingsUser,
   currentUser,
   token,
+  teams = [],
   onCloseAddModal,
   onCloseEditModal,
   onClosePasswordModal,
@@ -52,6 +61,7 @@ export const UserManagementModals: React.FC<UserManagementModalsProps> = ({
         onClose={onCloseAddModal}
         onSubmit={onAddUser}
         currentUserRole={currentUser.role}
+        teams={teams}
       />
 
       {editingUser && (

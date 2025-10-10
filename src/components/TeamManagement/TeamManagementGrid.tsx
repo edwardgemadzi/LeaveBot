@@ -22,6 +22,7 @@ interface TeamManagementGridProps {
   onSettings: (team: Team) => void;
   onViewMembers: (team: Team) => void;
   onDelete: (team: Team) => void;
+  onGenerateToken: (team: Team) => void;
   canEditTeam: (user: User, team: Team) => boolean;
 }
 
@@ -32,6 +33,7 @@ export const TeamManagementGrid: React.FC<TeamManagementGridProps> = ({
   onSettings,
   onViewMembers,
   onDelete,
+  onGenerateToken,
   canEditTeam
 }) => {
   if (teams.length === 0) {
@@ -54,6 +56,7 @@ export const TeamManagementGrid: React.FC<TeamManagementGridProps> = ({
           onSettings={() => onSettings(team)}
           onViewMembers={() => onViewMembers(team)}
           onDelete={() => onDelete(team)}
+          onGenerateToken={() => onGenerateToken(team)}
         />
       ))}
     </div>

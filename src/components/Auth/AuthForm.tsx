@@ -18,6 +18,7 @@ interface AuthFormProps {
     username: string;
     password: string;
     selectedTeamId: string;
+    teamToken: string;
   };
   onFormDataChange: (field: string, value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -73,6 +74,19 @@ export const AuthForm: React.FC<AuthFormProps> = ({
           selectedTeamId={formData.selectedTeamId}
           onTeamChange={(teamId) => onFormDataChange('selectedTeamId', teamId)}
           disabled={loading}
+        />
+      )}
+
+      {isRegistering && (
+        <AuthFormField
+          label="Team Registration Token"
+          type="text"
+          value={formData.teamToken}
+          onChange={(value) => onFormDataChange('teamToken', value)}
+          placeholder="Enter team token provided by your team leader"
+          required={false}
+          disabled={loading}
+          helpText="Get this token from your team leader or admin to join their team"
         />
       )}
 

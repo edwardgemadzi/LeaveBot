@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { User } from '../types'
+import { User, Team } from '../types'
 import { useUsers } from '../hooks/useUsers'
 import { useUserOperations } from '../hooks/useUserOperations'
 import { useLeaveBalances } from '../hooks/useLeaveBalances'
@@ -14,11 +14,13 @@ import { UserManagementLayout } from './UserManagement'
 interface UserManagementProps {
   currentUser: User
   token: string
+  teams?: Team[]
 }
 
 export default function UserManagement({
   currentUser,
   token,
+  teams = [],
 }: UserManagementProps) {
   const { users, loading, error, refetch } = useUsers(token)
   const { updateUser, deleteUser, changePassword, createUser } = useUserOperations(token)
@@ -108,6 +110,7 @@ export default function UserManagement({
     <UserManagementLayout
       currentUser={currentUser}
       users={usersWithBalances}
+      teams={teams}
       error={error}
       localError={localError}
       showAddModal={showAddModal}

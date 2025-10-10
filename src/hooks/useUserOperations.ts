@@ -75,6 +75,8 @@ export function useUserOperations(token: string) {
     password: string
     name: string
     role: 'admin' | 'leader' | 'user'
+    teamId?: string
+    teamToken?: string
   }) => {
     setLoading(true)
     setError('')
@@ -83,7 +85,9 @@ export function useUserOperations(token: string) {
       const result = await api.auth.register(
         userData.username,
         userData.password,
-        userData.name
+        userData.name,
+        userData.teamId,
+        userData.teamToken
       )
       if (result.success) {
         // Update role if different from default
