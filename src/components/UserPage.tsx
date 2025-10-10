@@ -9,7 +9,7 @@ import { useLeaves } from '../hooks/useLeaves'
 import { useToast } from '../hooks/useToast'
 import { LeaveListView } from './App/LeaveListView'
 import DashboardRefactored from './DashboardRefactored'
-import InteractiveCalendar from './InteractiveCalendar'
+import LeaveCalendar from './InteractiveCalendar'
 import UserProfileModal from './UserProfileModal'
 
 interface UserPageProps {
@@ -79,9 +79,11 @@ export default function UserPage({ user, token, currentView, onViewChange }: Use
         )}
 
         {currentView === 'calendar' && (
-          <InteractiveCalendar
+          <LeaveCalendar
             user={user}
+            leaves={leaves}
             token={token}
+            teamMembers={[]}
             onRefresh={handleLeaveUpdate}
             showToast={showToast}
             showError={showError}

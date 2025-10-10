@@ -12,11 +12,11 @@ import { useUserOperations } from '../hooks/useUserOperations'
 import { useTeamOperations } from '../hooks/useTeamOperations'
 import { useLeaveActions } from '../hooks/useLeaveActions'
 import { useToast } from '../hooks/useToast'
-import { UserManagementRefactored } from './UserManagement'
+import UserManagementRefactored from './UserManagementRefactored'
 import TeamManagementRefactored from './TeamManagementRefactored'
 import { LeaveListView } from './App/LeaveListView'
 import DashboardRefactored from './DashboardRefactored'
-import InteractiveCalendar from './InteractiveCalendar'
+import LeaveCalendar from './InteractiveCalendar'
 
 interface LeaderPageProps {
   user: User
@@ -87,9 +87,11 @@ export default function LeaderPage({ user, token, currentView, onViewChange }: L
         )}
 
         {currentView === 'calendar' && (
-          <InteractiveCalendar
+          <LeaveCalendar
             user={user}
+            leaves={leaves}
             token={token}
+            teamMembers={[]}
             onRefresh={handleLeaveUpdate}
             showToast={showToast}
             showError={showError}
