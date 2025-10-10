@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react'
 import { User, WorkingDaysResult } from '../../types'
 import { api } from '../../utils/api'
+import { LeaveBalance } from '../LeaveBalance'
 
 interface LeaveRequestFormProps {
   user: User
@@ -114,6 +115,17 @@ export default function LeaveRequestForm({
         <button onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-md font-medium">Cancel</button>
       </div>
 
+      {/* Leave Balance Display - Only show for regular users */}
+      {user.role === 'user' && (
+        <div className="mb-6">
+          <LeaveBalance 
+            userId={user.id} 
+            token={token} 
+            refreshKey={calculatedDays?.count}
+          />
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         {isAdmin && teamMembers.length > 0 && (
           <div className="mb-5">
@@ -165,6 +177,32 @@ export default function LeaveRequestForm({
             <p className="m-0 mb-1 text-sm text-slate-700"><strong>Calendar Days:</strong> {calculatedDays.calendarDays || 0}</p>
             {calculatedDays.warning && (
               <p className="mt-2 text-[13px] text-red-600 font-medium">⚠️ {calculatedDays.warning}</p>
+            )}
+            {calculatedDays.concurrentInfo && calculatedDays.concurrentInfo.enabled && (
+              <div className="mt-3 pt-3 border-t border-emerald-200">
+                {calculatedDays.concurrentInfo.count >= calculatedDays.concurrentInfo.limit ? (
+                  <div className="p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-amber-600">⚠️</span>
+                      <span className="font-medium text-amber-800">Concurrent Leave Alert</span>
+                    </div>
+                    <p className="text-amber-700">
+                      {calculatedDays.concurrentInfo.count} out of {calculatedDays.concurrentInfo.limit} team members 
+                      are already on leave during this period.
+                    </p>
+                    <p className="text-amber-600 mt-1">
+                      Contact your team leader if this is urgent.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-green-600">✅</span>
+                      <span className="text-green-700">No concurrent leave conflicts detected</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

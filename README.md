@@ -88,7 +88,40 @@ A secure web application for managing employee leave requests built with React, 
    ```
    Vercel will auto-deploy from GitHub.
 
-## 👥 User Management
+## 👥 User Management & Roles
+
+### Role-Based Access Control
+
+#### **👑 Admin Role**
+- **Purpose**: System administration and access management only
+- **Capabilities**:
+  - ✅ Create, edit, delete users and teams
+  - ✅ Manage team assignments and leaders
+  - ✅ Delete leave requests (for cleanup)
+  - ✅ View all system data and statistics
+- **Restrictions**:
+  - ❌ Cannot request leaves (admin role is for management only)
+  - ❌ Cannot access team calendars (no need for leave visibility)
+  - ❌ Cannot approve/reject leaves (team leaders handle this)
+
+#### **⭐ Team Leader Role**
+- **Purpose**: Manage team members and approve leave requests
+- **Capabilities**:
+  - ✅ Create and manage team members
+  - ✅ Approve/reject leave requests from team members
+  - ✅ View team calendar and leave schedules
+  - ✅ Request leaves for themselves
+  - ✅ Configure team settings and defaults
+- **Scope**: Limited to their assigned team only
+
+#### **👤 Regular User Role**
+- **Purpose**: Request leaves and view team calendar
+- **Capabilities**:
+  - ✅ Request leaves for themselves
+  - ✅ View team calendar and leave schedules
+  - ✅ See leave balance and available days
+  - ✅ View their own leave history
+- **Scope**: Limited to their team's calendar and their own requests
 
 ### First User Registration
 - **First registered user automatically becomes admin**
@@ -207,10 +240,31 @@ Content-Type: application/json
 }
 ```
 
+## ✨ Key Features
+
+### **📅 Leave Management**
+- **Visual Calendar**: Interactive calendar showing team leave schedules
+- **Leave Balance Tracking**: Real-time display of available leave days
+- **Working Days Calculation**: Only counts working days based on user settings
+- **Concurrent Leave Limits**: Prevents too many team members from being on leave simultaneously
+
+### **👥 Team Management**
+- **Team Isolation**: Each team sees only their own calendar and members
+- **Role-Based Access**: Admin, Team Leader, and Regular User roles with appropriate permissions
+- **Team Settings**: Configurable defaults for new team members
+- **Member Management**: Leaders can create and manage team members
+
+### **🔒 Security & Access Control**
+- **JWT Authentication**: Secure token-based authentication
+- **Rate Limiting**: Protection against brute force attacks
+- **Input Validation**: All inputs sanitized and validated
+- **Role-Based Permissions**: Granular access control based on user roles
+
 ## 🛠️ Technology Stack
 
 - **Frontend:** React 18, TypeScript, Vite
 - **Backend:** Vercel Serverless Functions (Node.js)
+- **Database:** MongoDB Atlas
 - **Authentication:** JWT (jsonwebtoken)
 - **Password Hashing:** bcrypt
 - **Deployment:** Vercel
