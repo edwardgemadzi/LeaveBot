@@ -1,147 +1,136 @@
-/**
- * Custom hook for authentication
- */
+import { useState, useEffect, useCallback } from 'react';
+import { api, ApiError } from '../services/api';
+import { User, LoginRequest, RegisterRequest } from '../types';
 
-import { useState, useEffect } from 'react'
-import { api, ApiError } from '../utils/api'
-import { User } from '../types'
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+}
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string>('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    token: null,
+    isLoading: true,
+    isAuthenticated: false,
+  });
 
-  // Load user from localStorage on mount
+  // Initialize auth state from localStorage
   useEffect(() => {
-    const savedToken = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('user')
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
 
-    if (savedToken && savedUser) {
+    if (token && userStr) {
       try {
-        const parsedUser = JSON.parse(savedUser)
-
-        // Migration: Force re-login if user.id is undefined
-        if (!parsedUser.id || parsedUser.id === 'undefined') {
-          console.log('Invalid user ID detected, clearing session...')
-          logout()
-          setError('Please log in again to continue')
-          setLoading(false)
-          return
-        }
-
-        setToken(savedToken)
-        setUser(parsedUser)
-      } catch (err) {
-        console.error('Failed to parse saved user:', err)
-        logout()
+        const user = JSON.parse(userStr);
+        setAuthState({
+          user,
+          token,
+          isLoading: false,
+          isAuthenticated: true,
+        });
+      } catch (error) {
+        // Invalid stored data, clear it
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setAuthState({
+          user: null,
+          token: null,
+          isLoading: false,
+          isAuthenticated: false,
+        });
       }
+    } else {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
+  }, []);
 
-    setLoading(false)
-  }, [])
-
-  const login = async (username: string, password: string) => {
-    setLoading(true)
-    setError('')
-
+  const login = useCallback(async (credentials: LoginRequest) => {
     try {
-      // Clean username (remove @ prefix)
-      const cleanUsername = username.replace(/^@+/, '')
-
-      const data = await api.auth.login(cleanUsername, password)
-
-      if (data.success && data.token && data.user) {
-        const userWithId = {
-          ...data.user,
-          id: data.user.id || data.user._id,
-        }
-
-        setToken(data.token)
-        setUser(userWithId)
-
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('user', JSON.stringify(userWithId))
-
-        return { success: true }
+      const response = await api.auth.login(credentials);
+      
+      if (response.success && response.data) {
+        const { token, user } = response.data;
+        
+        // Store in localStorage
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        setAuthState({
+          user,
+          token,
+          isLoading: false,
+          isAuthenticated: true,
+        });
+        
+        return { success: true };
+      } else {
+        return { success: false, error: response.error || 'Login failed' };
       }
-
-      setError(data.error || 'Login failed')
-      return { success: false, error: data.error }
-    } catch (err) {
-      const errorMsg =
-        err instanceof ApiError
-          ? err.message
-          : 'Network error. Please check your connection.'
-      setError(errorMsg)
-      return { success: false, error: errorMsg }
-    } finally {
-      setLoading(false)
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Network error. Please try again.' };
     }
-  }
+  }, []);
 
-  const register = async (
-    username: string,
-    password: string,
-    name: string,
-    role?: 'user' | 'leader',
-    teamId?: string,
-    teamToken?: string,
-    teamName?: string
-  ) => {
-    setLoading(true)
-    setError('')
-
+  const register = useCallback(async (userData: RegisterRequest) => {
     try {
-      // Clean username (remove @ prefix)
-      const cleanUsername = username.replace(/^@+/, '')
-
-      const data = await api.auth.register(cleanUsername, password, name, teamId, teamToken, teamName, role)
-
-      if (data.success && data.token && data.user) {
-        const userWithId = {
-          ...data.user,
-          id: data.user.id || data.user._id,
-        }
-
-        setToken(data.token)
-        setUser(userWithId)
-
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('user', JSON.stringify(userWithId))
-
-        return { success: true }
+      const response = await api.auth.register(userData);
+      
+      if (response.success && response.data) {
+        const { token, user } = response.data;
+        
+        // Store in localStorage
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        setAuthState({
+          user,
+          token,
+          isLoading: false,
+          isAuthenticated: true,
+        });
+        
+        return { success: true };
+      } else {
+        return { success: false, error: response.error || 'Registration failed' };
       }
-
-      setError(data.error || 'Registration failed')
-      return { success: false, error: data.error }
-    } catch (err) {
-      const errorMsg =
-        err instanceof ApiError
-          ? err.message
-          : 'Network error. Please check your connection.'
-      setError(errorMsg)
-      return { success: false, error: errorMsg }
-    } finally {
-      setLoading(false)
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Network error. Please try again.' };
     }
-  }
+  }, []);
 
-  const logout = () => {
-    setUser(null)
-    setToken('')
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-  }
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setAuthState({
+      user: null,
+      token: null,
+      isLoading: false,
+      isAuthenticated: false,
+    });
+  }, []);
+
+  const updateUser = useCallback((updatedUser: User) => {
+    setAuthState(prev => ({
+      ...prev,
+      user: updatedUser,
+    }));
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  }, []);
 
   return {
-    user,
-    token,
-    loading,
-    error,
+    ...authState,
     login,
     register,
     logout,
-    isAuthenticated: !!user && !!token,
-  }
+    updateUser,
+  };
 }

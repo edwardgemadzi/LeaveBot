@@ -1,79 +1,120 @@
-// Centralized type definitions for the LeaveBot application
-
+// User types
 export interface User {
-  id: string
-  _id?: string
+  _id: string
   username: string
   name: string
+  email?: string
   role: 'admin' | 'leader' | 'user'
   teamId?: string
-  createdAt?: string
-  leaveBalance?: {
-    total: number
-    used: number
-    remaining: number
-  }
+  createdAt: Date
 }
 
+// Leave types
 export interface Leave {
   _id: string
-  id?: string
-  employeeName: string
   userId: string
-  startDate: string
-  endDate: string
-  leaveType?: string
+  employeeName: string
+  startDate: Date
+  endDate: Date
   reason: string
+  type: 'annual' | 'sick' | 'personal' | 'other'
   status: 'pending' | 'approved' | 'rejected'
-  createdAt: string
-  workingDaysCount?: number
-  calendarDaysCount?: number
-  shiftPattern?: string
-  shiftTime?: string
-  teamId?: string
+  workingDays: number
+  teamId: string
+  createdAt: Date
 }
 
+// Team types
 export interface Team {
   _id: string
-  id?: string
   name: string
   description?: string
   leaderId: string
-  leaderName?: string
-  members?: string[]
-  memberCount?: number
-  settings?: TeamSettings
-  createdAt: string
+  memberIds: string[]
+  settings: TeamSettings
+  createdAt: Date
 }
 
 export interface TeamSettings {
-  annualLeaveDays?: number
-  maxConcurrentLeave?: number
-  shiftPattern?: ShiftPattern
-  shiftTime?: ShiftTime
-  concurrentLeave?: {
-    enabled: boolean
-    maxPerTeam: number
-  }
+  annualLeaveDays: number
+  requireApproval: boolean
+  maxConcurrentLeave: number
+  workingDays: WorkingDays
 }
 
-export interface UserSettings {
-  shiftPattern: ShiftPattern
-  shiftTime: ShiftTime
+export interface WorkingDays {
+  monday: boolean
+  tuesday: boolean
+  wednesday: boolean
+  thursday: boolean
+  friday: boolean
+  saturday: boolean
+  sunday: boolean
 }
 
-export interface ShiftPattern {
-  type: 'regular' | '2-2' | '3-3' | '4-4' | '5-5' | 'custom'
-  customPattern?: string
-  referenceDate?: string
+// API Response types
+export interface ApiResponse<T = any> {
+  success: boolean
+  data?: T
+  error?: string
+  message?: string
 }
 
-export interface ShiftTime {
-  type: 'day' | 'night' | 'custom'
-  customStart?: string
-  customEnd?: string
+// Auth types
+export interface LoginRequest {
+  username: string
+  password: string
 }
 
+export interface RegisterRequest {
+  username: string
+  password: string
+  name: string
+  role: 'admin' | 'leader' | 'user'
+  teamToken?: string
+  teamName?: string
+}
+
+export interface AuthResponse {
+  token: string
+  user: User
+}
+
+// Form types
+export interface LeaveRequestForm {
+  startDate: Date
+  endDate: Date
+  reason: string
+  type: 'annual' | 'sick' | 'personal' | 'other'
+}
+
+export interface UserForm {
+  username: string
+  password: string
+  name: string
+  role: 'admin' | 'leader' | 'user'
+  teamId?: string
+}
+
+export interface TeamForm {
+  name: string
+  description?: string
+  leaderId?: string
+}
+
+// UI State types
+export interface LoadingState {
+  isLoading: boolean
+  error?: string
+}
+
+export interface PaginationState {
+  page: number
+  limit: number
+  total: number
+}
+
+// Calendar types
 export interface CalendarEvent {
   id: string
   title: string
@@ -82,21 +123,33 @@ export interface CalendarEvent {
   resource: Leave
 }
 
-export interface DateRange {
-  start: Date
-  end: Date
+// Dashboard types
+export interface DashboardStats {
+  totalLeaves: number
+  pendingLeaves: number
+  approvedLeaves: number
+  rejectedLeaves: number
+  teamMembers?: number
+  remainingDays?: number
 }
 
-export interface WorkingDaysResult {
-  count: number
-  calendarDays: number
-  dates: string[]
-  warning?: string
-  shiftPattern?: string
-  shiftTime?: string
-  concurrentInfo?: {
-    count: number
-    limit: number
-    enabled: boolean
-  }
+// Filter types
+export interface LeaveFilter {
+  status?: 'pending' | 'approved' | 'rejected'
+  type?: 'annual' | 'sick' | 'personal' | 'other'
+  userId?: string
+  teamId?: string
+  dateFrom?: Date
+  dateTo?: Date
+}
+
+export interface UserFilter {
+  role?: 'admin' | 'leader' | 'user'
+  teamId?: string
+  search?: string
+}
+
+export interface TeamFilter {
+  leaderId?: string
+  search?: string
 }

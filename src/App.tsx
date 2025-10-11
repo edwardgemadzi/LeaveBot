@@ -1,123 +1,126 @@
-/**
- * Refactored Main Application Component
- * Orchestrates authentication, routing, and main views
- */
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './hooks/useAuth';
+import LoginForm from './components/auth/LoginForm';
+import RegisterForm from './components/auth/RegisterForm';
+import Layout from './components/layout/Layout';
+import LoadingSpinner from './components/shared/LoadingSpinner';
+import { ToastContainer, Toast } from './components/shared/Toast';
 
-import React, { useState, useEffect, useMemo } from 'react'
-import './App.css'
-import { useAuth } from './hooks/useAuth'
-import { useLeaves } from './hooks/useLeaves'
-import { useUsers } from './hooks/useUsers'
-import { useTeams } from './hooks/useTeams'
-import { useToast } from './hooks/useToast'
-import Authentication from './components/Auth/Authentication'
-import { AppLayout } from './components/App'
-import { useUserSettings } from './hooks/useUserSettings'
-import { useTeamMembers } from './hooks/useTeamMembers'
-import { useAutoRefresh } from './hooks/useAutoRefresh'
+// Placeholder components for different views
+const Dashboard = () => (
+  <div className="bg-white rounded-lg shadow p-6">
+    <h2 className="text-2xl font-bold text-gray-900 mb-4">Dashboard</h2>
+    <p className="text-gray-600">Dashboard content will be implemented here.</p>
+  </div>
+);
 
-type View = 'dashboard' | 'calendar' | 'list' | 'team' | 'teams' | 'team-settings'
+const Calendar = () => (
+  <div className="bg-white rounded-lg shadow p-6">
+    <h2 className="text-2xl font-bold text-gray-900 mb-4">Calendar</h2>
+    <p className="text-gray-600">Calendar view will be implemented here.</p>
+  </div>
+);
 
-function App() {
-  const { user, token, loading: authLoading, error: authError, login, register, logout, isAuthenticated } = useAuth()
-  const { leaves, loading: leavesLoading, updateLeaveStatus, refetch: refetchLeaves } = useLeaves(token, isAuthenticated)
-  const { users } = useUsers(token, false)
-  const { teams } = useTeams(token, isAuthenticated)
-  const { toasts, success, error: showError, closeToast } = useToast()
+const Requests = () => (
+  <div className="bg-white rounded-lg shadow p-6">
+    <h2 className="text-2xl font-bold text-gray-900 mb-4">Leave Requests</h2>
+    <p className="text-gray-600">Leave requests will be implemented here.</p>
+  </div>
+);
 
-  const [currentView, setCurrentView] = useState<View>('dashboard')
-  const [searchFilter, setSearchFilter] = useState({ search: '', status: '' })
-  const [showProfileSettings, setShowProfileSettings] = useState(false)
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
-  const { settings: userSettings } = useUserSettings(user?.id, token)
-  // Remove requestDates state - no longer needed
+const Teams = () => (
+  <div className="bg-white rounded-lg shadow p-6">
+    <h2 className="text-2xl font-bold text-gray-900 mb-4">Teams</h2>
+    <p className="text-gray-600">Team management will be implemented here.</p>
+  </div>
+);
 
-  // Auto-refresh leaves every 30 seconds
-  useAutoRefresh(refetchLeaves, isAuthenticated, 30000)
+const Users = () => (
+  <div className="bg-white rounded-lg shadow p-6">
+    <h2 className="text-2xl font-bold text-gray-900 mb-4">Users</h2>
+    <p className="text-gray-600">User management will be implemented here.</p>
+  </div>
+);
 
-  // Load team members for admins/leaders
-  const { members } = useTeamMembers(token, !!user && (user.role === 'admin' || user.role === 'leader'))
-  useEffect(() => { setTeamMembers(members as any[]) }, [members])
+export default function App() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const [currentView, setCurrentView] = useState('dashboard');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // Filter leaves based on search, status, and user role
-  const filteredLeaves = useMemo(() => {
-    return leaves.filter((leave) => {
-      // For regular users, only show their own requests
-      if (user?.role === 'user' && leave.userId !== user.id) {
-        return false
-      }
-
-      const matchesSearch =
-        !searchFilter.search ||
-        leave.employeeName.toLowerCase().includes(searchFilter.search.toLowerCase()) ||
-        (leave.reason && leave.reason.toLowerCase().includes(searchFilter.search.toLowerCase()))
-
-      const matchesStatus = !searchFilter.status || leave.status === searchFilter.status
-
-      return matchesSearch && matchesStatus
-    })
-  }, [leaves, searchFilter, user])
-
-  const handleStatusUpdate = async (leaveId: string, status: 'approved' | 'rejected') => {
-    const result = await updateLeaveStatus(leaveId, status)
-    if (result.success) {
-      success(`Leave ${status} successfully!`)
-    } else {
-      showError(result.error || `Failed to ${status} leave`)
-    }
-  }
-
-  // Show loading during initial auth check
-  if (authLoading) {
+  // Show loading spinner while checking authentication
+  if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <p>Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
       </div>
-    )
+    );
   }
 
-  // Show authentication if not logged in
-  if (!isAuthenticated) {
+  // Show authentication forms if not authenticated
+  if (!isAuthenticated || !user) {
     return (
-      <Authentication
-        onLogin={login}
-        onRegister={register}
-        loading={authLoading}
-        error={authError}
-      />
-    )
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          {authMode === 'login' ? (
+            <LoginForm
+              onSuccess={() => {
+                // Authentication success is handled by useAuth hook
+              }}
+              onSwitchToRegister={() => setAuthMode('register')}
+            />
+          ) : (
+            <RegisterForm
+              onSuccess={() => {
+                // Registration success is handled by useAuth hook
+              }}
+              onSwitchToLogin={() => setAuthMode('login')}
+            />
+          )}
+        </div>
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
+      </div>
+    );
   }
 
-  const isAdmin = user!.role === 'admin' || user!.role === 'leader'
+  // Render the main application
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'calendar':
+        return <Calendar />;
+      case 'requests':
+      case 'team-requests':
+      case 'my-requests':
+        return <Requests />;
+      case 'teams':
+      case 'team-management':
+        return <Teams />;
+      case 'users':
+        return <Users />;
+      default:
+        return <Dashboard />;
+    }
+  };
 
   return (
-    <AppLayout
-      user={user!}
-      currentView={currentView}
-      leaves={leaves}
-      filteredLeaves={filteredLeaves}
-      leavesLoading={leavesLoading}
-      isAdmin={isAdmin}
-      teamMembers={teamMembers}
-      teams={teams}
-      userSettings={userSettings}
-      searchFilter={searchFilter}
-      showProfileSettings={showProfileSettings}
-      toasts={toasts}
-      onViewChange={setCurrentView}
-      onSettingsClick={() => setShowProfileSettings(true)}
-      onLogout={logout}
-      onLeaveUpdate={refetchLeaves}
-      onRequestLeave={() => {}} // Will be handled by calendar popup
-      onStatusUpdate={handleStatusUpdate}
-      onFilterChange={setSearchFilter}
-      onCloseProfileSettings={() => setShowProfileSettings(false)}
-      onCloseToast={closeToast}
-      showToast={success}
-      showError={showError}
-      token={token}
-    />
-  )
-}
+    <>
+      <Layout
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        title="Leave Management System"
+      >
+        {renderCurrentView()}
+      </Layout>
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+    </>
+  );
 
-export default App
+  function removeToast(id: string) {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }
+}
