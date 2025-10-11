@@ -1,12 +1,12 @@
-import React, { useState } from 'react'
-import { addDays } from 'date-fns'
+import React, { useState, useMemo } from 'react'
+import { Calendar, momentLocalizer } from 'react-big-calendar'
+import moment from 'moment'
 import { Plus } from 'lucide-react'
 import type { Leave, User, UserSettings, CalendarEvent } from '../types'
-import { useTeamMembersSettings } from '../hooks/useTeamMembersSettings'
-import { useCalendarEvents } from '../hooks/useCalendarEvents'
-import { getEventStyle, getDayStyle } from '../utils/calendarStyles'
-// Removed Calendar imports - using simplified implementation
 import LeaveRequestForm from './Leaves/LeaveRequestForm'
+import 'react-big-calendar/lib/css/react-big-calendar.css'
+
+const localizer = momentLocalizer(moment)
 
 function CalendarHeader({ user, onShowRequestForm }: { user: User; onShowRequestForm?: () => void }) {
   return (
@@ -52,70 +52,151 @@ interface LeaveCalendarProps {
 }
 
 export default function LeaveCalendar({ user, leaves, userSettings, token, teamMembers, onRefresh, showToast, showError }: LeaveCalendarProps) {
-  const [view, setView] = useState<string>('month')
+  const [view, setView] = useState<'month' | 'week' | 'day'>('month')
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [selectedDates, setSelectedDates] = useState<{ startDate: Date; endDate: Date } | null>(null)
-  // All team members should see the team calendar (no toggle needed)
-  const showTeamOnly = true
-  
-  // Fetch all team members' settings using custom hook
-  const { teamMembersSettings } = useTeamMembersSettings(leaves, token)
-  
-  // Generate calendar events using custom hook
-  const events = useCalendarEvents({ leaves, user, showTeamOnly, teamMembersSettings })
+
+  // Convert leaves to calendar events
+  const events = useMemo(() => {
+    return leaves.map(leave => ({
+      id: leave.id || leave._id,
+      title: `${leave.employeeName} - ${leave.reason || 'Leave'}`,
+      start: new Date(leave.startDate),
+      end: new Date(leave.endDate),
+      resource: {
+        status: leave.status,
+        leaveId: leave.id || leave._id,
+        employeeName: leave.employeeName
+      }
+    }))
+  }, [leaves])
 
   // Handle slot selection for leave requests
-  const handleSelectSlot = (slotInfo: any) => {
+  const handleSelectSlot = ({ start, end }: { start: Date; end: Date }) => {
     if (user.role === 'user') {
-      setSelectedDates({
-        startDate: slotInfo.start,
-        endDate: slotInfo.end
-      })
+      setSelectedDates({ startDate: start, endDate: end })
       setShowRequestForm(true)
     }
   }
 
   // Handle event selection
-  const handleSelectEvent = (event: CalendarEvent) => {
-    // Could show event details in a popup if needed
-    console.log('Selected event:', event)
+  const handleSelectEvent = (event: any) => {
+    console.log('Event clicked:', event)
   }
 
-  const eventStyleGetter = (event: CalendarEvent) => {
-    return getEventStyle(event, user)
-  }
+  // Custom event style based on status
+  const eventStyleGetter = (event: any) => {
+    const status = event.resource?.status
+    let backgroundColor = '#3174ad'
+    
+    switch (status) {
+      case 'approved':
+        backgroundColor = '#10b981'
+        break
+      case 'rejected':
+        backgroundColor = '#ef4444'
+        break
+      case 'pending':
+        backgroundColor = '#f59e0b'
+        break
+      default:
+        backgroundColor = '#3174ad'
+    }
 
-  // No special day styling - all team members see the same calendar
-  const dayPropGetter = (date: Date) => {
-    return {} // No special styling for consistency across team members
+    return {
+      style: {
+        backgroundColor,
+        borderRadius: '4px',
+        opacity: 0.8,
+        color: 'white',
+        border: '0px',
+        display: 'block'
+      }
+    }
   }
 
   return (
     <div className="p-5">
       <CalendarHeader user={user} onShowRequestForm={() => setShowRequestForm(true)} />
       
-      {/* Remove calendar controls - all team members see the same team calendar */}
+      {/* Calendar Controls */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <button
+          onClick={() => setView('month')}
+          style={{
+            padding: '8px 16px',
+            background: view === 'month' ? '#3b82f6' : '#e5e7eb',
+            color: view === 'month' ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Month
+        </button>
+        <button
+          onClick={() => setView('week')}
+          style={{
+            padding: '8px 16px',
+            background: view === 'week' ? '#3b82f6' : '#e5e7eb',
+            color: view === 'week' ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Week
+        </button>
+        <button
+          onClick={() => setView('day')}
+          style={{
+            padding: '8px 16px',
+            background: view === 'day' ? '#3b82f6' : '#e5e7eb',
+            color: view === 'day' ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Day
+        </button>
+      </div>
 
-      {/* Remove calendar legend - all team members see the same calendar */}
-
-      {/* Simplified Calendar - TODO: Implement proper calendar component */}
-      <div style={{ 
-        padding: '20px', 
-        background: '#f8f9fa', 
-        borderRadius: '8px', 
-        textAlign: 'center',
-        minHeight: '400px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div>
-          <h3 style={{ color: '#6b7280', marginBottom: '10px' }}>📅 Calendar View</h3>
-          <p style={{ color: '#9ca3af' }}>
-            Calendar component needs to be implemented.<br/>
-            Events: {events.length} | View: {view}
-          </p>
+      {/* Calendar Legend */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '20px', fontSize: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '16px', height: '16px', background: '#10b981', borderRadius: '4px' }}></div>
+          <span>Approved</span>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '16px', height: '16px', background: '#f59e0b', borderRadius: '4px' }}></div>
+          <span>Pending</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '16px', height: '16px', background: '#ef4444', borderRadius: '4px' }}></div>
+          <span>Rejected</span>
+        </div>
+      </div>
+
+      {/* Working Calendar Component */}
+      <div style={{ height: '600px', background: 'white', borderRadius: '8px', padding: '20px' }}>
+        <Calendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          style={{ height: '100%' }}
+          view={view}
+          onView={setView}
+          onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
+          selectable={user.role === 'user'}
+          eventPropGetter={eventStyleGetter}
+          popup
+          showMultiDayTimes
+          step={15}
+          timeslots={4}
+        />
       </div>
 
       {/* Leave Request Form Popup */}
