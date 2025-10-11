@@ -19,19 +19,23 @@ export function useAuth() {
 
   // Initialize auth state from localStorage
   useEffect(() => {
+    console.log('🔄 Initializing auth state...');
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
+        console.log('✅ Found stored auth data:', user.username);
         setAuthState({
           user,
           token,
           isLoading: false,
           isAuthenticated: true,
         });
+        console.log('🎉 User authenticated from storage');
       } catch (error) {
+        console.log('❌ Invalid stored auth data, clearing...');
         // Invalid stored data, clear it
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -43,16 +47,20 @@ export function useAuth() {
         });
       }
     } else {
+      console.log('ℹ️ No stored auth data found');
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, []);
 
   const login = useCallback(async (credentials: LoginRequest) => {
     try {
+      console.log('🔐 Attempting login for:', credentials.username);
       const response = await api.auth.login(credentials);
+      console.log('📡 Login response:', response);
       
       if (response.success && response.data) {
         const { token, user } = response.data;
+        console.log('✅ Login successful, storing auth data');
         
         // Store in localStorage
         localStorage.setItem('token', token);
@@ -65,11 +73,14 @@ export function useAuth() {
           isAuthenticated: true,
         });
         
+        console.log('🎉 Auth state updated, user authenticated');
         return { success: true };
       } else {
+        console.log('❌ Login failed:', response.error);
         return { success: false, error: response.error || 'Login failed' };
       }
     } catch (error) {
+      console.error('💥 Login error:', error);
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
@@ -108,6 +119,7 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(() => {
+    console.log('🚪 Logging out user');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setAuthState({
@@ -116,6 +128,7 @@ export function useAuth() {
       isLoading: false,
       isAuthenticated: false,
     });
+    console.log('✅ User logged out successfully');
   }, []);
 
   const updateUser = useCallback((updatedUser: User) => {
